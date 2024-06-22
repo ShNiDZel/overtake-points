@@ -8,7 +8,7 @@ local hsv = hsv
 local ac = ac
 local ui = ui
 
-local requiredSpeed = 95
+local requiredSpeed = 35
 
 -- Global state variables
 local timePassed = 0
@@ -154,7 +154,7 @@ function script.update(dt)
                 state.maxPosDot = math.max(state.maxPosDot, posDot)
                 if posDot < -0.5 and state.maxPosDot > 0.5 then
                     local distance = car.pos:distance(player.pos)
-                    if distance < 4 and distance >= 2.5 then  -- Near hit overtake
+                    if distance < 2.5 and distance >= 2.5 then  -- Near hit overtake
                         totalScore = totalScore + math.ceil(15 * comboMeter)
                         comboMeter = comboMeter + 1.5
                         comboColor = comboColor + 120
