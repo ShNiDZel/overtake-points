@@ -1,8 +1,8 @@
 -- Author: NiDZ
--- Version: 0.6
+-- Version: 0.7
 
 -- Constants
-local requiredSpeed = 35
+local requiredSpeed = 50
 
 -- Game State Variables
 local timePassed = 0
@@ -14,11 +14,6 @@ local dangerouslySlowTimer = 0
 local carsState = {}
 local wheelsWarningTimeout = 0
 
--- Prepare function to run before the main start
-function script.prepare(dt)
-    -- Initialization code can be placed here if needed
-end
-
 -- Utility function to initialize car state
 local function initializeCarState(index)
     carsState[index] = {
@@ -26,14 +21,17 @@ local function initializeCarState(index)
         overtaken = false,
         collided = false,
         drivingAlong = true,
-        nearMiss = false
+        nearMissHandled = false  -- Track if near miss has been handled
     }
 end
 
--- Initialize carsState for existing cars at the start
-local sim = ac.getSimState()
-for i = 1, sim.carsCount do
-    initializeCarState(i)
+-- Prepare function to run before the main start
+function script.prepare(dt)
+    -- Initialize carsState for existing cars at the start
+    local sim = ac.getSimState()
+    for i = 1, sim.carsCount do
+        initializeCarState(i)
+    end
 end
 
 -- Function to handle near misses
@@ -42,7 +40,7 @@ local function handleNearMiss(car, player, state)
     local veryCloseNearMissThreshold = 1.5
 
     -- Check if the near miss condition is met
-    if not state.nearMiss and car.pos:closerToThan(player.pos, nearMissThreshold) then
+    if not state.nearMissHandled and car.pos:closerToThan(player.pos, nearMissThreshold) then
         if car.pos:closerToThan(player.pos, veryCloseNearMissThreshold) then
             totalScore = totalScore + math.ceil(10 * comboMeter)
             comboMeter = comboMeter + 3
@@ -54,7 +52,7 @@ local function handleNearMiss(car, player, state)
             comboColor = comboColor + 90
             addMessage("Near miss: bonus combo", comboMeter > 15 and 1 or 0)
         end
-        state.nearMiss = true
+        state.nearMissHandled = true
     end
 end
 
@@ -66,7 +64,7 @@ local function handleCollision(state)
 
         if totalScore > highestScore then
             highestScore = math.floor(totalScore)
-            ac.sendChatMessage("scored " .. totalScore .. " points.")
+            ac.sendChatMessage("Score " .. totalScore .. " Total Points")
         end
         totalScore = 0
         comboMeter = 1
@@ -174,18 +172,23 @@ function script.update(dt)
         local car = ac.getCarState(i)
         local state = carsState[i]
 
+        -- Reset near miss handling flag if car is no longer close
+        if not car.pos:closerToThan(player.pos, 5) then
+            state.nearMissHandled = false
+        end
+
         if car.pos:closerToThan(player.pos, 5) then
             local drivingAlong = math.dot(car.look, player.look) > 0.5
             if not drivingAlong then
                 state.drivingAlong = false
 
                 -- Only handle near miss if it hasn't been handled yet
-                if not state.nearMiss then
+                if not state.nearMissHandled then
                     handleNearMiss(car, player, state)
                 end
             end
 
-            if car.collidedWith == 0 then
+            if car.collidedWith ~= 0 then
                 handleCollision(state)
             elseif not state.overtaken and not state.collided and state.drivingAlong then
                 handleOvertake(car, player, state)
@@ -196,7 +199,7 @@ function script.update(dt)
             state.overtaken = false
             state.collided = false
             state.drivingAlong = true
-            state.nearMiss = false
+            state.nearMissHandled = false
         end
     end
 end
