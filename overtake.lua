@@ -22,7 +22,7 @@ local dangerouslySlowTimer = 0
 local carsState = {}
 local wheelsWarningTimeout = 0
 
--- Function to handle scoring for near misses
+-- Function to handle near misses
 local function handleNearMiss(car, player, state)
     local nearMissThreshold = 2
     local veryCloseNearMissThreshold = 1.5
@@ -38,8 +38,8 @@ local function handleNearMiss(car, player, state)
             comboMeter = comboMeter + 1
             comboColor = comboColor + 90
             addMessage("Near miss: bonus combo", comboMeter > 15 and 1 or 0)
-            state.nearMiss = true
         end
+        state.nearMiss = true
     end
 end
 
@@ -77,16 +77,16 @@ function script.update(dt)
         addMessage("Lets GO!!!", 0)
     end
 
-    -- Get the car State
+    -- Get the car state
     local player = ac.getCarState(1)
 
-    -- IF the Engine les than 1
+    -- If the engine life is less than 1
     if player.engineLifeLeft < 1 then
-        -- IF the score is higher than the previos one
+        -- If the score is higher than the previous one
         if totalScore > highestScore then
             highestScore = math.floor(totalScore)
-            -- Send ingame chat to the Server
-            ac.sendChatMessage("Score" .. totalScore .. "Total Points")
+            -- Send in-game chat to the server
+            ac.sendChatMessage("Score" .. totalScore .. " Total Points")
         end
         -- Reset everything when total score is 0
         totalScore = 0
@@ -97,29 +97,30 @@ function script.update(dt)
     -- Increase the time elapsed from the last frame
     timePassed = timePassed + dt
 
-    -- محاسبه میزان کاهش کمبو به ازای گذشت زمان و سرعت ماشین
+    -- Calculate combo fading rate based on time and car speed
     local comboFadingRate = 0.5 * math.lerp(1, 0.1, math.lerpInvSat(player.speedKmh, 80, 200)) + player.wheelsOutside
     comboMeter = math.max(1, comboMeter - dt * comboFadingRate)
 
-    -- دریافت وضعیت شبیه‌ساز بازی
+    -- Get the simulation state
     local sim = ac.getSimState()
 
-    -- تعداد ماشین‌ها به تعداد وضعیت ماشین‌ها در آرایه ماشین‌ها افزوده می‌شود
+    -- Add car states to the carsState array if there are new cars
     while sim.carsCount > #carsState do
         carsState[#carsState + 1] = {}
     end
 
-    -- اگر زمان محدودیت هشدار چرخ‌ها (wheelsWarningTimeout) بیشتر از صفر باشد، کاهش می‌یابد
+    -- Decrease the wheels warning timeout if it is greater than 0
     if wheelsWarningTimeout > 0 then
         wheelsWarningTimeout = wheelsWarningTimeout - dt
     elseif player.wheelsOutside > 0 then
-        -- اگر چرخ‌های ماشین خارج از مسیر باشند، پیام هشدار نمایش داده می‌شود
+        -- Display a warning message if the car's wheels are outside the track
         if wheelsWarningTimeout == 0 then
+            addMessage("Car is outside", -1)
         end
-        addMessage("Car is outside",-1)
         wheelsWarningTimeout = 60
     end
 
+    -- Check if the player's speed is below the required speed
     if player.speedKmh < requiredSpeed then
         if dangerouslySlowTimer > 3 then
             if totalScore > highestScore then
@@ -140,32 +141,33 @@ function script.update(dt)
         dangerouslySlowTimer = 0
     end
 
-    for i = 1, ac.getSimState().carsCount do
-    local car = ac.getCarState(i)
-    local state = carsState[i]
+    -- Process each car in the simulation
+    for i = 1, sim.carsCount do
+        local car = ac.getCarState(i)
+        local state = carsState[i]
 
-    if car.pos:closerToThan(player.pos, 5) then
-        local drivingAlong = math.dot(car.look, player.look) > 0.5
-        if not drivingAlong then
-            state.drivingAlong = false
+        if car.pos:closerToThan(player.pos, 5) then
+            local drivingAlong = math.dot(car.look, player.look) > 0.5
+            if not drivingAlong then
+                state.drivingAlong = false
 
-           if not state.nearMiss then
-                handleNearMiss(car, player, state)
+                if not state.nearMiss then
+                    handleNearMiss(car, player, state)
+                end
             end
-        end
 
-        if car.collidedWith == 0 then
-            handleCollision(state)
-        elseif not state.overtaken and not state.collided and state.drivingAlong then
-            handleOvertake(car, player, state)
-        end
-    else
-        -- Reset state if the car is no longer close to the player
-        state.maxPosDot = -1
-        state.overtaken = false
-        state.collided = false
-        state.drivingAlong = true
-        state.nearMiss = false
+            if car.collidedWith ~= 0 then
+                handleCollision(state)
+            elseif not state.overtaken and not state.collided and state.drivingAlong then
+                handleOvertake(car, player, state)
+            end
+        else
+            -- Reset state if the car is no longer close to the player
+            state.maxPosDot = -1
+            state.overtaken = false
+            state.collided = false
+            state.drivingAlong = true
+            state.nearMiss = false
         end
     end
 end
