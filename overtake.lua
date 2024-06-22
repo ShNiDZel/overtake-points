@@ -25,6 +25,11 @@ local wheelsWarningTimeout = 0
 -- Function to handle scoring for near misses
 local function handleNearMiss(car, player, state)
     if car.pos:closerToThan(player.pos, 1.5) then
+        totalScore = totalScore + math.ceil(10 * comboMeter)
+        comboMeter = comboMeter + 3
+        comboColor = comboColor + 90
+        addMessage("Very close near miss!", comboMeter > 10 and 1 or 0)
+    else
         totalScore = totalScore + math.ceil(15 * comboMeter)
         comboMeter = comboMeter + 1
         comboColor = comboColor + 90
