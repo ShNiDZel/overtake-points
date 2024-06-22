@@ -1,18 +1,18 @@
--- Author: Atilxor
+-- Author: NiDZ
 -- Version: 0.5
 
 
 local requiredSpeed = 95
 
--- تابع پیش‌زمینه (prepare) برای اجرا پیش از شروع اصلی
+-- Prepare function to run before the main start
 function script.prepare(dt)
-    -- نمایش سرعت ماشین بازیکن در کنسول اختصاصی
+    -- Display the speed of the player's car in the dedicated console
     ac.debug("speed", ac.getCarState(1).speedKmh)
-    -- بررسی شرط برای ادامه اجرا
+    -- Check the condition to continue executing
     return ac.getCarState(1).speedKmh > 60
 end
 
--- وضعیت رویداد:
+-- Event Status
 local timePassed = 0
 local totalScore = 0
 local comboMeter = 1
@@ -22,31 +22,31 @@ local dangerouslySlowTimer = 0
 local carsState = {}
 local wheelsWarningTimeout = 0
 
--- تابع بروزرسانی (update) برای اجرا در هر فریم
+-- Checking for function update for every frame
 function script.update(dt)
-    -- اگر زمان گذشته برابر صفر باشد، پیام "شروع!" نمایش داده می‌شود
+    -- When time passes 0, display the "Start!" Message
     if timePassed == 0 then
-        addMessage("بیایید شروع کنیم!", 0)
+        addMessage("Lets GO!!!", 0)
     end
 
-    -- دریافت وضعیت ماشین بازیکن
+    -- Get the car State
     local player = ac.getCarState(1)
 
-    -- اگر میزان دیگرانه‌گری (engineLifeLeft) کمتر از 1 شود
+    -- IF the Engine les than 1
     if player.engineLifeLeft < 1 then
-        -- اگر مجموع امتیازات بیشتر از بالاترین امتیاز ثبت شده باشد، بالاترین امتیاز به مقدار صحیح محاسبه می‌شود
+        -- IF the score is higher than the previos one
         if totalScore > highestScore then
             highestScore = math.floor(totalScore)
-            -- ارسال پیام چت به بازی با امتیاز به همراه متن
-            ac.sendChatMessage("امتیاز " .. totalScore .. " امتیاز را کسب کرد.")
+            -- Send ingame chat to the Server
+            ac.sendChatMessage("Score" .. totalScore .. "Total Points")
         end
-        -- مجموع امتیازات صفر می‌شود و میزان دیگرانه‌گری به حالت اولیه برگشت می‌شود
+        -- Reset everything when total score is 0
         totalScore = 0
         comboMeter = 1
         return
     end
 
-    -- افزایش زمان گذشته با مقدار زمان گذشته از آخرین فریم
+    -- Increase the time elapsed from the last frame
     timePassed = timePassed + dt
 
     -- محاسبه میزان کاهش کمبو به ازای گذشت زمان و سرعت ماشین
@@ -68,7 +68,7 @@ function script.update(dt)
         -- اگر چرخ‌های ماشین خارج از مسیر باشند، پیام هشدار نمایش داده می‌شود
         if wheelsWarningTimeout == 0 then
         end
-        addMessage("ماشین خارج از مسیر است", -1)
+        addMessage("Car is outside",-1)
         wheelsWarningTimeout = 60
     end
 
