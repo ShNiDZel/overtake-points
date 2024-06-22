@@ -1,18 +1,10 @@
 -- Author: NiDZ
 -- Version: 0.5
 
-
+-- Constants
 local requiredSpeed = 50
 
--- Prepare function to run before the main start
-function script.prepare(dt)
-    -- Display the speed of the player's car in the dedicated console
-    ac.debug("speed", ac.getCarState(1).speedKmh)
-    -- Check the condition to continue executing
-    return ac.getCarState(1).speedKmh > 60
-end
-
--- Event Status
+-- Game State Variables
 local timePassed = 0
 local totalScore = 0
 local comboMeter = 1
@@ -21,6 +13,28 @@ local highestScore = 0
 local dangerouslySlowTimer = 0
 local carsState = {}
 local wheelsWarningTimeout = 0
+
+-- Prepare function to run before the main start
+function script.prepare(dt)
+    -- Initialization code can be placed here if needed
+end
+
+-- Utility function to initialize car state
+local function initializeCarState(index)
+    carsState[index] = {
+        maxPosDot = -1,
+        overtaken = false,
+        collided = false,
+        drivingAlong = true,
+        nearMiss = false
+    }
+end
+
+-- Initialize carsState for existing cars at the start
+local sim = ac.getSimState()
+for i = 1, sim.carsCount do
+    initializeCarState(i)
+end
 
 -- Function to handle near misses
 local function handleNearMiss(car, player, state)
@@ -70,9 +84,9 @@ local function handleOvertake(car, player, state)
     end
 end
 
--- Checking for function update for every frame
+-- Main update function to be called every frame
 function script.update(dt)
-    -- When time passes 0, display the "Start!" Message
+    -- When time passes 0, display the "Start!" message
     if timePassed == 0 then
         addMessage("Lets GO!!!", 0)
     end
@@ -86,7 +100,7 @@ function script.update(dt)
         if totalScore > highestScore then
             highestScore = math.floor(totalScore)
             -- Send in-game chat to the server
-            ac.sendChatMessage("Score" .. totalScore .. " Total Points")
+            ac.sendChatMessage("Score " .. totalScore .. " Total Points")
         end
         -- Reset everything when total score is 0
         totalScore = 0
@@ -106,7 +120,7 @@ function script.update(dt)
 
     -- Add car states to the carsState array if there are new cars
     while sim.carsCount > #carsState do
-        carsState[#carsState + 1] = {}
+        initializeCarState(#carsState + 1)
     end
 
     -- Decrease the wheels warning timeout if it is greater than 0
@@ -131,7 +145,7 @@ function script.update(dt)
             comboMeter = 1
         else
             if dangerouslySlowTimer == 0 then
-                addMessage("We Ball Now", -1)
+                addMessage("Too Slow BRO!!!", -1)
             end
         end
         dangerouslySlowTimer = dangerouslySlowTimer + dt
@@ -156,7 +170,7 @@ function script.update(dt)
                 end
             end
 
-            if car.collidedWith == 0 then
+            if car.collidedWith ~= 0 then
                 handleCollision(state)
             elseif not state.overtaken and not state.collided and state.drivingAlong then
                 handleOvertake(car, player, state)
