@@ -1,5 +1,5 @@
 -- Author: NiDZ
--- Version: 0.9
+-- Version: 0.9.0.1
 
 -- Constants
 local requiredSpeed = 50
@@ -59,7 +59,7 @@ end
 
 -- Function to handle collisions
 local function handleCollision(car, player, state)
-    if not state.collided and car.collidedWith ~= 0 then
+    if not state.collided and car.collidedWith == 0 then
         addMessage("Collision", -1)
         state.collided = true
 
