@@ -7,7 +7,6 @@ local hsv = hsv
 local ac = ac
 local ui = ui
 
-local requiredSpeed = 95
 local requiredSpeed = 35
 
 -- Global state variables
