@@ -77,16 +77,16 @@ local function handleOvertake(car, player, state)
     state.maxPosDot = math.max(state.maxPosDot, posDot)
 
     -- Check for near hit during overtaking
-    local nearHitThreshold = 1.0
+    local nearHitThreshold = 2
     if car.pos:closerToThan(player.pos, nearHitThreshold) then
         totalScore = totalScore + math.ceil(5 * comboMeter)
-        comboMeter = comboMeter + 1
+        comboMeter = comboMeter + 3
         comboColor = comboColor + 90
         addMessage("Near hit during overtaking", comboMeter > 10 and 1 or 0)
     end
 
     -- Check for successful overtake
-    if posDot < -0.5 and state.maxPosDot > 0.5 then
+    if posDot < -1.5 and state.maxPosDot > 1.5 then
         totalScore = totalScore + math.ceil(20 * comboMeter)
         comboMeter = comboMeter + 2
         comboColor = comboColor + 90
