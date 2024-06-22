@@ -24,17 +24,22 @@ local wheelsWarningTimeout = 0
 
 -- Function to handle scoring for near misses
 local function handleNearMiss(car, player, state)
-    if car.pos:closerToThan(player.pos, 1.5) then
-        totalScore = totalScore + math.ceil(10 * comboMeter)
-        comboMeter = comboMeter + 3
-        comboColor = comboColor + 90
-        addMessage("Very close near miss!", comboMeter > 10 and 1 or 0)
-    else
-        totalScore = totalScore + math.ceil(15 * comboMeter)
-        comboMeter = comboMeter + 1
-        comboColor = comboColor + 90
-        addMessage("Near miss: bonus combo", comboMeter > 15 and 1 or 0)
-        state.nearMiss = true
+    local nearMissThreshold = 2
+    local veryCloseNearMissThreshold = 1.5
+
+    if car.pos:closerToThan(player.pos, nearMissThreshold) then
+        if car.pos:closerToThan(player.pos, veryCloseNearMissThreshold) then
+            totalScore = totalScore + math.ceil(10 * comboMeter)
+            comboMeter = comboMeter + 3
+            comboColor = comboColor + 90
+            addMessage("Very close near miss!", comboMeter > 10 and 1 or 0)
+        else
+            totalScore = totalScore + math.ceil(15 * comboMeter)
+            comboMeter = comboMeter + 1
+            comboColor = comboColor + 90
+            addMessage("Near miss: bonus combo", comboMeter > 15 and 1 or 0)
+            state.nearMiss = true
+        end
     end
 end
 
@@ -140,11 +145,11 @@ function script.update(dt)
     local state = carsState[i]
 
     if car.pos:closerToThan(player.pos, 5) then
-        local drivingAlong = math.dot(car.look, player.look) > 0.1
+        local drivingAlong = math.dot(car.look, player.look) > 0.5
         if not drivingAlong then
             state.drivingAlong = false
 
-            if not state.nearMiss and car.pos:closerToThan(player.pos, 2) then
+           if not state.nearMiss then
                 handleNearMiss(car, player, state)
             end
         end
@@ -251,11 +256,11 @@ local speedWarning = 0
             end
         end
 
-        ui.beginTransparentWindow("overtakeScore", vec2(200, 200), vec2(600 * 1.5, 600 * 1.5))
+        ui.beginTransparentWindow("overtakeScore", vec2(100, 100), vec2(400 * 1.5, 400 * 1.5))
         ui.beginOutline()
 
         ui.pushStyleVar(ui.StyleVar.Alpha, 1 - speedWarning)
-        ui.pushFont(ui.Font.Header)
+        ui.pushFont(ui.Font.Title)
         ui.text('NiDZ No Hesi')
         ui.text("Highest Score: " .. highestScore .. " pts")
         ui.popFont()
