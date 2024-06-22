@@ -158,13 +158,13 @@ function script.update(dt)
                         totalScore = totalScore + math.ceil(10 * comboMeter)
                         comboMeter = comboMeter + 1.5
                         comboColor = comboColor + 120
-                        addMessage("Near Hit Overtake!", comboMeter > 20 and 1 or 0)
+                        addMessage("That's So Close!", comboMeter > 20 and 1 or 0)
                         ac.debug("Near hit overtake", distance)
                     else  -- Normal overtake
                         totalScore = totalScore + math.ceil(10 * comboMeter)
                         comboMeter = comboMeter + 1
                         comboColor = comboColor + 90
-                        addMessage("Overtake", comboMeter > 20 and 1 or 0)
+                        addMessage("Nice Overtake", comboMeter > 20 and 1 or 0)
                     end
                     state.overtaken = true
                 end
