@@ -1,5 +1,5 @@
 -- Author: NiDZ
--- Version: 0.1
+-- Version: 0.1.1
 
 local math = math
 local vec2 = vec2
@@ -8,7 +8,7 @@ local hsv = hsv
 local ac = ac
 local ui = ui
 
-local requiredSpeed = 35
+local requiredSpeed = 95
 
 -- Global state variables
 local timePassed = 0
@@ -38,6 +38,9 @@ local function addMessage(text, mood)
     if mood == 1 then
         addGlitter(60)
     end
+    
+    -- Add debug output
+    ac.debug("Message added", text, mood)
 end
 
 local function addGlitter(count, pos)
@@ -56,7 +59,7 @@ end
 
 function script.update(dt)
     if timePassed == 0 then
-        addMessage("بیایید شروع کنیم!", 0)
+        addMessage("Let's start!", 0)
     end
 
     local player = ac.getCarState(1)
@@ -64,7 +67,7 @@ function script.update(dt)
     if player.engineLifeLeft < 1 then
         if totalScore > highestScore then
             highestScore = math.floor(totalScore)
-            ac.sendChatMessage("امتیاز " .. totalScore .. " امتیاز را کسب کرد.")
+            ac.sendChatMessage("Scored " .. totalScore .. " points.")
         end
         totalScore = 0
         comboMeter = 1
@@ -86,7 +89,7 @@ function script.update(dt)
         wheelsWarningTimeout = wheelsWarningTimeout - dt
     elseif player.wheelsOutside > 0 then
         if wheelsWarningTimeout == 0 then
-            addMessage("ماشین خارج از مسیر است", -1)
+            addMessage("Car is off track", -1)
             wheelsWarningTimeout = 60
         end
     end
@@ -95,13 +98,13 @@ function script.update(dt)
         if dangerouslySlowTimer > 3 then
             if totalScore > highestScore then
                 highestScore = math.floor(totalScore)
-                ac.sendChatMessage("scored " .. totalScore .. " points.")
+                ac.sendChatMessage("Scored " .. totalScore .. " points.")
             end
             totalScore = 0
             comboMeter = 1
         else
             if dangerouslySlowTimer == 0 then
-                addMessage("Speed Ro Bishtar Kon!", -1)
+                addMessage("Speed up!", -1)
             end
         end
         dangerouslySlowTimer = dangerouslySlowTimer + dt
@@ -130,6 +133,9 @@ function script.update(dt)
                         comboMeter = comboMeter + 1
                         addMessage("Near miss: bonus combo", 0)
                     end
+                    
+                    -- Add debug output
+                    ac.debug("Near miss detected", car.pos:distance(player.pos))
                 end
             end
 
@@ -139,7 +145,7 @@ function script.update(dt)
 
                 if totalScore > highestScore then
                     highestScore = math.floor(totalScore)
-                    ac.sendChatMessage("scored " .. totalScore .. " points.")
+                    ac.sendChatMessage("Scored " .. totalScore .. " points.")
                 end
                 totalScore = 0
                 comboMeter = 1
@@ -213,12 +219,12 @@ function script.drawUI()
 
     local colorCombo = rgbm.new(hsv(comboColor, math.saturate(comboMeter / 10), 1):rgb(), math.saturate(comboMeter / 4))
 
-    ui.beginTransparentWindow("overtakeScore", vec2(100, 100), vec2(400 * 0.5, 400 * 0.5))
+    ui.beginTransparentWindow("overtakeScore", vec2(100, 100), vec2(400 * 1.5, 400 * 1.5))
     ui.beginOutline()
 
     ui.pushStyleVar(ui.StyleVar.Alpha, 1 - speedWarning)
     ui.pushFont(ui.Font.Main)
-    ui.text('Made By Atilxor\'')
+    ui.text('No Hesi Just Drive')
     ui.text("Highest Score: " .. highestScore .. " pts")
     ui.popFont()
     ui.popStyleVar()
@@ -244,6 +250,9 @@ function script.drawUI()
             m.text,
             m.mood == 1 and rgbm(0, 1, 0, f) or m.mood == -1 and rgbm(1, 0, 0, f) or rgbm(1, 1, 1, f)
         )
+        
+        -- Add debug output
+        ac.debug("Displaying message", m.text, m.age, m.currentPos)
     end
     for i = 1, glitterCount do
         local g = glitter[i]
