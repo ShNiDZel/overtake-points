@@ -188,7 +188,7 @@ function script.update(dt)
                 end
             end
 
-            if car.collidedWith ~= 0 then
+            if car.collidedWith == 0 then
                 handleCollision(state)
             elseif not state.overtaken and not state.collided and state.drivingAlong then
                 handleOvertake(car, player, state)
