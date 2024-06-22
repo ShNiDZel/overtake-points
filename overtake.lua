@@ -22,6 +22,49 @@ local dangerouslySlowTimer = 0
 local carsState = {}
 local wheelsWarningTimeout = 0
 
+-- Function to handle scoring for near misses
+local function handleNearMiss(car, player, state)
+    if car.pos:closerToThan(player.pos, 1.5) then
+        totalScore = totalScore + math.ceil(10 * comboMeter)
+        comboMeter = comboMeter + 3
+        comboColor = comboColor + 90
+        addMessage("Very close near miss!", comboMeter > 10 and 1 or 0)
+    else
+        totalScore = totalScore + math.ceil(15 * comboMeter)
+        comboMeter = comboMeter + 1
+        comboColor = comboColor + 90
+        addMessage("Near miss: bonus combo", comboMeter > 15 and 1 or 0)
+        state.nearMiss = true
+    end
+end
+
+-- Function to handle collisions
+local function handleCollision(state)
+    addMessage("Collision", -1)
+    state.collided = true
+
+    if totalScore > highestScore then
+        highestScore = math.floor(totalScore)
+        ac.sendChatMessage("scored " .. totalScore .. " points.")
+    end
+    totalScore = 0
+    comboMeter = 1
+end
+
+-- Function to handle overtakes
+local function handleOvertake(car, player, state)
+    local posDir = (car.pos - player.pos):normalize()
+    local posDot = math.dot(posDir, car.look)
+    state.maxPosDot = math.max(state.maxPosDot, posDot)
+    if posDot < -0.5 and state.maxPosDot > 0.5 then
+        totalScore = totalScore + math.ceil(20 * comboMeter)
+        comboMeter = comboMeter + 2
+        comboColor = comboColor + 90
+        addMessage("Overtake", comboMeter > 20 and 1 or 0)
+        state.overtaken = true
+    end
+end
+
 -- Checking for function update for every frame
 function script.update(dt)
     -- When time passes 0, display the "Start!" Message
@@ -93,60 +136,31 @@ function script.update(dt)
     end
 
     for i = 1, ac.getSimState().carsCount do
-        local car = ac.getCarState(i)
-        local state = carsState[i]
+    local car = ac.getCarState(i)
+    local state = carsState[i]
 
-        if car.pos:closerToThan(player.pos, 10) then
-            local drivingAlong = math.dot(car.look, player.look) > 0.2
-            if not drivingAlong then
-                state.drivingAlong = false
+    if car.pos:closerToThan(player.pos, 5) then
+        local drivingAlong = math.dot(car.look, player.look) > 0.1
+        if not drivingAlong then
+            state.drivingAlong = false
 
-                if not state.nearMiss and car.pos:closerToThan(player.pos, 2) then
-                    if car.pos:closerToThan(player.pos, 1.5) then
-                        totalScore = totalScore + math.ceil(10 * comboMeter)
-                        comboMeter = comboMeter + 3
-                        comboColor = comboColor + 90
-                        addMessage("Very close near miss!", comboMeter > 10 and 1 or 0)
-                    else
-                        totalScore = totalScore + math.ceil(15 * comboMeter)
-                        comboMeter = comboMeter + 1
-                        comboColor = comboColor + 90
-                        addMessage("Near miss: bonus combo", comboMeter > 15 and 1 or 0)
-                        state.nearMiss = true
-                    end
-                end
+            if not state.nearMiss and car.pos:closerToThan(player.pos, 2) then
+                handleNearMiss(car, player, state)
             end
+        end
 
-            if car.collidedWith == 0 then
-                addMessage("Collision", -1)
-                state.collided = true
-
-                if totalScore > highestScore then
-                    highestScore = math.floor(totalScore)
-                    ac.sendChatMessage("scored " .. totalScore .. " points.")
-                end
-                totalScore = 0
-                comboMeter = 1
-            end
-
-            if not state.overtaken and not state.collided and state.drivingAlong then
-                local posDir = (car.pos - player.pos):normalize()
-                local posDot = math.dot(posDir, car.look)
-                state.maxPosDot = math.max(state.maxPosDot, posDot)
-                if posDot < -0.5 and state.maxPosDot > 0.5 then
-                    totalScore = totalScore + math.ceil(20 * comboMeter)
-                    comboMeter = comboMeter + 2
-                    comboColor = comboColor + 90
-                    addMessage("Overtake", comboMeter > 20 and 1 or 0)
-                    state.overtaken = true
-                end
-            end
-        else
-            state.maxPosDot = -1
-            state.overtaken = false
-            state.collided = false
-            state.drivingAlong = true
-            state.nearMiss = false
+        if car.collidedWith ~= 0 then
+            handleCollision(state)
+        elseif not state.overtaken and not state.collided and state.drivingAlong then
+            handleOvertake(car, player, state)
+        end
+    else
+        -- Reset state if the car is no longer close to the player
+        state.maxPosDot = -1
+        state.overtaken = false
+        state.collided = false
+        state.drivingAlong = true
+        state.nearMiss = false
         end
     end
 end
