@@ -2,7 +2,7 @@
 -- Version: 0.1
 
 -- Constants
-local requiredSpeed = 95
+local requiredSpeed = 35
 
 -- Game state variables
 local timePassed = 0
