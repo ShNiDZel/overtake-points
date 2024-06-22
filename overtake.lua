@@ -131,7 +131,7 @@ function script.update(dt)
             comboMeter = 1
         else
             if dangerouslySlowTimer == 0 then
-                addMessage("Too Slow BRO!!!", -1)
+                addMessage("We Ball Now", -1)
             end
         end
         dangerouslySlowTimer = dangerouslySlowTimer + dt
@@ -156,7 +156,7 @@ function script.update(dt)
                 end
             end
 
-            if car.collidedWith ~= 0 then
+            if car.collidedWith == 0 then
                 handleCollision(state)
             elseif not state.overtaken and not state.collided and state.drivingAlong then
                 handleOvertake(car, player, state)
