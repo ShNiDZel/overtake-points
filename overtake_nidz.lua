@@ -154,15 +154,15 @@ function script.update(dt)
                 state.maxPosDot = math.max(state.maxPosDot, posDot)
                 if posDot < -0.5 and state.maxPosDot > 0.5 then
                     local distance = car.pos:distance(player.pos)
-                    if distance < 2.5 and distance >= 2.5 then  -- Near hit overtake
+                    if distance < 3 and distance >= 2.5 then  -- Near hit overtake
                         totalScore = totalScore + math.ceil(15 * comboMeter)
-                        comboMeter = comboMeter + 1.5
+                        comboMeter = comboMeter + 3.5
                         comboColor = comboColor + 120
                         addMessage("Near Hit Overtake!", 1)
                         ac.debug("Near hit overtake", distance)
                     else  -- Normal overtake
                         totalScore = totalScore + math.ceil(10 * comboMeter)
-                        comboMeter = comboMeter + 1
+                        comboMeter = comboMeter + 3
                         comboColor = comboColor + 90
                         addMessage("Overtake", comboMeter > 20 and 1 or 0)
                     end
