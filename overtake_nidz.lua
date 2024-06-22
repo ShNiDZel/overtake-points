@@ -1,5 +1,5 @@
 -- Author: NiDZ (Modified by Assistant)
--- Version: 0.1.2
+-- Version: 0.1.3
 
 local math = math
 local vec2 = vec2
@@ -115,15 +115,16 @@ function script.update(dt)
     for i = 1, sim.carsCount do
         local car = ac.getCarState(i)
         local state = carsState[i]
-
+    
         if car.pos:closerToThan(player.pos, 10) then
             local drivingAlong = math.dot(car.look, player.look) > 0.2
             if not drivingAlong then
                 state.drivingAlong = false
-
+    
+                -- Check for near misses
                 if not state.nearMiss and car.pos:closerToThan(player.pos, 3) then
                     state.nearMiss = true
-
+    
                     if car.pos:closerToThan(player.pos, 2.5) then
                         comboMeter = comboMeter + 3
                         addMessage("Very close near miss!", 1)
@@ -135,11 +136,12 @@ function script.update(dt)
                     ac.debug("Near miss detected", car.pos:distance(player.pos))
                 end
             end
-
+    
+            -- Check for collisions
             if car.collidedWith == 0 then
                 addMessage("Collision", -1)
                 state.collided = true
-
+    
                 if totalScore > highestScore then
                     highestScore = math.floor(totalScore)
                     ac.sendChatMessage("Scored " .. totalScore .. " points.")
@@ -147,11 +149,12 @@ function script.update(dt)
                 totalScore = 0
                 comboMeter = 1
             end
-
-            if not state.overtaken and not state.collided and state.drivingAlong then
+    
+            -- Check for overtakes
+            if not state.overtakeMessageDisplayed and not state.collided and state.drivingAlong then
                 local posDir = (car.pos - player.pos):normalize()
                 local posDot = math.dot(posDir, car.look)
-                state.maxPosDot = math.max(state.maxPosDot, posDot)
+                state.maxPosDot = state.maxPosDot or -1
                 if posDot < -0.5 and state.maxPosDot > 0.5 then
                     local distance = car.pos:distance(player.pos)
                     if distance < 4 and distance >= 2.5 then  -- Near hit overtake
@@ -166,11 +169,13 @@ function script.update(dt)
                         comboColor = comboColor + 90
                         addMessage("Overtake", comboMeter > 20 and 1 or 0)
                     end
-                    state.overtaken = true
+                    state.overtakeMessageDisplayed = true  -- Mark overtaken in this cycle
                 end
             end
         else
+            -- Reset state when not close to player
             state.maxPosDot = -1
+            state.overtakeMessageDisplayed = false
             state.overtaken = false
             state.collided = false
             state.drivingAlong = true
