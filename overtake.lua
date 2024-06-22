@@ -2,7 +2,7 @@
 -- Version: 0.5
 
 -- Constants
-local requiredSpeed = 50
+local requiredSpeed = 35
 
 -- Game State Variables
 local timePassed = 0
@@ -170,7 +170,7 @@ function script.update(dt)
                 end
             end
 
-            if car.collidedWith ~= 0 then
+            if car.collidedWith == 0 then
                 handleCollision(state)
             elseif not state.overtaken and not state.collided and state.drivingAlong then
                 handleOvertake(car, player, state)
