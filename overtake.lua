@@ -1,5 +1,5 @@
 -- Author: NiDZ
--- Version: 0.9.0.1
+-- Version: 0.9.2
 
 -- Constants
 local requiredSpeed = 50
@@ -37,8 +37,8 @@ end
 
 -- Function to handle near misses
 local function handleNearMiss(car, player, state)
-    local nearMissThreshold = 2
-    local veryCloseNearMissThreshold = 1.5
+    local nearMissThreshold = 5
+    local veryCloseNearMissThreshold = 3
 
     -- Check if the near miss condition is met
     if not state.nearMissHandled and car.pos:closerToThan(player.pos, nearMissThreshold) then
@@ -59,7 +59,7 @@ end
 
 -- Function to handle collisions
 local function handleCollision(car, player, state)
-    if not state.collided and car.collidedWith == 0 then
+    if not state.collided and car.collidedWith ~= 0 then
         addMessage("Collision", -1)
         state.collided = true
 
@@ -79,7 +79,7 @@ local function handleOvertake(car, player, state)
     state.maxPosDot = math.max(state.maxPosDot, posDot)
 
     -- Check for near hit during overtaking
-    local nearHitThreshold = 1.0
+    local nearHitThreshold = 2.0
     if not state.nearHitOvertakeHandled and car.pos:closerToThan(player.pos, nearHitThreshold) then
         totalScore = totalScore + math.ceil(5 * comboMeter)
         comboMeter = comboMeter + 1
@@ -132,11 +132,6 @@ function script.update(dt)
     -- Get the simulation state
     local sim = ac.getSimState()
 
-    -- Add car states to the carsState array if there are new cars
-    while sim.carsCount > #carsState do
-        initializeCarState(#carsState + 1)
-    end
-
     -- Decrease the wheels warning timeout if it is greater than 0
     if wheelsWarningTimeout > 0 then
         wheelsWarningTimeout = wheelsWarningTimeout - dt
@@ -175,16 +170,16 @@ function script.update(dt)
         local state = carsState[i]
 
         -- Reset near miss handling flag if car is no longer close
-        if not car.pos:closerToThan(player.pos, 5) then
+        if not car.pos:closerToThan(player.pos, 10) then
             state.nearMissHandled = false
         end
 
         -- Reset near hit overtaking handling flag if car is no longer close or overtaken
-        if not car.pos:closerToThan(player.pos, 5) or state.overtaken then
+        if not car.pos:closerToThan(player.pos, 10) or state.overtaken then
             state.nearHitOvertakeHandled = false
         end
 
-        if car.pos:closerToThan(player.pos, 5) then
+        if car.pos:closerToThan(player.pos, 10) then
             local drivingAlong = math.dot(car.look, player.look) > 0.5
             if not drivingAlong then
                 state.drivingAlong = false
@@ -195,8 +190,10 @@ function script.update(dt)
                 end
             end
 
-            -- Check and handle collision
-            handleCollision(car, player, state)
+            -- Check and handle collision only if not already handled
+            if not state.collided then
+                handleCollision(car, player, state)
+            end
 
             -- Only handle overtake if the car is not collided and driving along
             if not state.overtaken and not state.collided and state.drivingAlong then
