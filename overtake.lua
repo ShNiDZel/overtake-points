@@ -2,7 +2,7 @@
 -- Version: 0.5
 
 
-local requiredSpeed = 95
+local requiredSpeed = 50
 
 -- Prepare function to run before the main start
 function script.prepare(dt)
@@ -82,7 +82,7 @@ function script.update(dt)
             comboMeter = 1
         else
             if dangerouslySlowTimer == 0 then
-                addMessage("Speed Ro Bishtar Kon!", -1)
+                addMessage("Too Slow BRO!!!", -1)
             end
         end
         dangerouslySlowTimer = dangerouslySlowTimer + dt
@@ -101,15 +101,18 @@ function script.update(dt)
             if not drivingAlong then
                 state.drivingAlong = false
 
-                if not state.nearMiss and car.pos:closerToThan(player.pos, 3) then
-                    state.nearMiss = true
-
-                    if car.pos:closerToThan(player.pos, 2.5) then
+                if not state.nearMiss and car.pos:closerToThan(player.pos, 2) then
+                    if car.pos:closerToThan(player.pos, 1.5) then
+                        totalScore = totalScore + math.ceil(10 * comboMeter)
                         comboMeter = comboMeter + 3
-                        addMessage("Very close near miss!", 1)
+                        comboColor = comboColor + 90
+                        addMessage("Very close near miss!", comboMeter > 10 and 1 or 0)
                     else
+                        totalScore = totalScore + math.ceil(15 * comboMeter)
                         comboMeter = comboMeter + 1
-                        addMessage("Near miss: bonus combo", 0)
+                        comboColor = comboColor + 90
+                        addMessage("Near miss: bonus combo", comboMeter > 15 and 1 or 0)
+                        state.nearMiss = true
                     end
                 end
             end
@@ -131,8 +134,8 @@ function script.update(dt)
                 local posDot = math.dot(posDir, car.look)
                 state.maxPosDot = math.max(state.maxPosDot, posDot)
                 if posDot < -0.5 and state.maxPosDot > 0.5 then
-                    totalScore = totalScore + math.ceil(10 * comboMeter)
-                    comboMeter = comboMeter + 1
+                    totalScore = totalScore + math.ceil(20 * comboMeter)
+                    comboMeter = comboMeter + 2
                     comboColor = comboColor + 90
                     addMessage("Overtake", comboMeter > 20 and 1 or 0)
                     state.overtaken = true
