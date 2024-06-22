@@ -1,5 +1,5 @@
 -- Author: NiDZ
--- Version: 0.7
+-- Version: 0.8
 
 -- Constants
 local requiredSpeed = 50
@@ -21,7 +21,8 @@ local function initializeCarState(index)
         overtaken = false,
         collided = false,
         drivingAlong = true,
-        nearMissHandled = false  -- Track if near miss has been handled
+        nearMissHandled = false,  -- Track if near miss has been handled
+        nearHitOvertakeHandled = false  -- Track if near hit during overtaking has been handled
     }
 end
 
@@ -79,11 +80,12 @@ local function handleOvertake(car, player, state)
 
     -- Check for near hit during overtaking
     local nearHitThreshold = 1.0
-    if car.pos:closerToThan(player.pos, nearHitThreshold) then
+    if not state.nearHitOvertakeHandled and car.pos:closerToThan(player.pos, nearHitThreshold) then
         totalScore = totalScore + math.ceil(5 * comboMeter)
         comboMeter = comboMeter + 1
         comboColor = comboColor + 90
         addMessage("Near hit during overtaking", comboMeter > 10 and 1 or 0)
+        state.nearHitOvertakeHandled = true
     end
 
     -- Check for successful overtake
@@ -177,6 +179,11 @@ function script.update(dt)
             state.nearMissHandled = false
         end
 
+        -- Reset near hit overtaking handling flag if car is no longer close or overtaken
+        if not car.pos:closerToThan(player.pos, 5) or state.overtaken then
+            state.nearHitOvertakeHandled = false
+        end
+
         if car.pos:closerToThan(player.pos, 5) then
             local drivingAlong = math.dot(car.look, player.look) > 0.5
             if not drivingAlong then
@@ -188,7 +195,7 @@ function script.update(dt)
                 end
             end
 
-            if car.collidedWith == 0 then
+            if car.collidedWith ~= 0 then
                 handleCollision(state)
             elseif not state.overtaken and not state.collided and state.drivingAlong then
                 handleOvertake(car, player, state)
@@ -200,6 +207,7 @@ function script.update(dt)
             state.collided = false
             state.drivingAlong = true
             state.nearMissHandled = false
+            state.nearHitOvertakeHandled = false
         end
     end
 end
