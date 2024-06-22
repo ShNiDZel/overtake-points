@@ -1,7 +1,5 @@
 -- Author: NiDZ (Modified by Assistant)
--- Version: 0.1.4
-
--- Import necessary modules
+-- Version: 0.1.3
 local math = math
 local vec2 = vec2
 local rgbm = rgbm
@@ -9,7 +7,7 @@ local hsv = hsv
 local ac = ac
 local ui = ui
 
--- Constants
+local requiredSpeed = 95
 local requiredSpeed = 35
 
 -- Global state variables
@@ -25,27 +23,21 @@ local messages = {}
 local glitter = {}
 local glitterCount = 0
 local speedWarning = 0
-
--- Function to add a message to the message queue
+function script.prepare(dt)
+    ac.debug("speed", ac.getCarState(1).speedKmh)
+    return ac.getCarState(1).speedKmh > 60
+end
 local function addMessage(text, mood)
-    -- Shift existing messages in the queue
     for i = math.min(#messages + 1, 4), 2, -1 do
         messages[i] = messages[i - 1]
         messages[i].targetPos = i
     end
-
-    -- Insert new message at the beginning
     messages[1] = {text = text, age = 0, targetPos = 1, currentPos = 1, mood = mood}
-
-    -- Trigger glitter effect for positive mood messages
     if mood == 1 then
         addGlitter(60)
     end
-
     ac.debug("Message added", text, mood)
 end
-
--- Function to add glitter effects
 local function addGlitter(count, pos)
     pos = pos or vec2(80, 140)
     for _ = 1, count do
@@ -59,39 +51,27 @@ local function addGlitter(count, pos)
         }
     end
 end
-
--- Function to update game logic
-local function updateGameLogic(dt)
+function script.update(dt)
+    if timePassed == 0 then
+        addMessage("Let's start!", 0)
+    end
     local player = ac.getCarState(1)
-
-    -- Handle game over condition
     if player.engineLifeLeft < 1 then
-        handleGameOver()
+        if totalScore > highestScore then
+            highestScore = math.floor(totalScore)
+            ac.sendChatMessage("Scored " .. totalScore .. " points.")
+        end
+        totalScore = 0
+        comboMeter = 1
         return
     end
-
-    -- Update combo meter
+    timePassed = timePassed + dt
     local comboFadingRate = 0.5 * math.lerp(1, 0.1, math.lerpInvSat(player.speedKmh, 80, 200)) + player.wheelsOutside
     comboMeter = math.max(1, comboMeter - dt * comboFadingRate)
-
-    -- Check for wheels outside warning
-    handleWheelsOutsideWarning(dt, player)
-
-    -- Check for dangerously slow speed
-    handleDangerouslySlowSpeed(dt, player)
-
-    -- Update state for each car in the simulation
-    for i = 1, ac.getSimState().carsCount do
-        local car = ac.getCarState(i)
-        local state = carsState[i] or {}
-
-        -- Handle car interactions with player's car
-        handleCarInteractions(dt, player, car, state)
+    local sim = ac.getSimState()
+    while sim.carsCount > #carsState do
+        table.insert(carsState, {})
     end
-end
-
--- Function to handle wheels outside warning
-local function handleWheelsOutsideWarning(dt, player)
     if wheelsWarningTimeout > 0 then
         wheelsWarningTimeout = wheelsWarningTimeout - dt
     elseif player.wheelsOutside > 0 then
@@ -100,113 +80,96 @@ local function handleWheelsOutsideWarning(dt, player)
             wheelsWarningTimeout = 60
         end
     end
-end
-
--- Function to handle dangerously slow speed warning and game over condition
-local function handleDangerouslySlowSpeed(dt, player)
     if player.speedKmh < requiredSpeed then
-        dangerouslySlowTimer = dangerouslySlowTimer + dt
         if dangerouslySlowTimer > 3 then
-            handleGameOver()
-            return
-        elseif dangerouslySlowTimer == 0 then
-            addMessage("Speed up!", -1)
+            if totalScore > highestScore then
+                highestScore = math.floor(totalScore)
+                ac.sendChatMessage("Scored " .. totalScore .. " points.")
+            end
+            totalScore = 0
+            comboMeter = 1
+        else
+            if dangerouslySlowTimer == 0 then
+                addMessage("Speed up!", -1)
+            end
         end
+        dangerouslySlowTimer = dangerouslySlowTimer + dt
         comboMeter = 1
+        return
     else
         dangerouslySlowTimer = 0
     end
-end
-
--- Function to handle interactions between player's car and other cars
-local function handleCarInteractions(dt, player, car, state)
-    if car.pos:closerToThan(player.pos, 10) then
-        local drivingAlong = math.dot(car.look, player.look) > 0.2
-        if not drivingAlong then
-            state.drivingAlong = false
-            handleNearMiss(car, player, state)
-        end
-
-        if car.collidedWith == 0 then
-            handleCollision(state)
-        end
-
-        if not state.overtakeMessageDisplayed and not state.collided and state.drivingAlong then
-            handleOvertake(car, player, state)
-        end
-    else
-        resetCarState(state)
-    end
-end
-
--- Function to handle near misses
-local function handleNearMiss(car, player, state)
-    if not state.nearMiss and car.pos:closerToThan(player.pos, 3) then
-        state.nearMiss = true
-        if car.pos:closerToThan(player.pos, 2.5) then
-            comboMeter = comboMeter + 3
-            addMessage("Very close near miss!", 1)
+    for i = 1, sim.carsCount do
+        local car = ac.getCarState(i)
+        local state = carsState[i]
+    
+        if car.pos:closerToThan(player.pos, 10) then
+            local drivingAlong = math.dot(car.look, player.look) > 0.2
+            if not drivingAlong then
+                state.drivingAlong = false
+    
+                -- Check for near misses
+                if not state.nearMiss and car.pos:closerToThan(player.pos, 3) then
+                    state.nearMiss = true
+    
+                    if car.pos:closerToThan(player.pos, 2.5) then
+                        comboMeter = comboMeter + 3
+                        addMessage("Very close near miss!", 1)
+                    else
+                        comboMeter = comboMeter + 1
+                        addMessage("Near miss: bonus combo", 0)
+                    end
+                    
+                    ac.debug("Near miss detected", car.pos:distance(player.pos))
+                end
+            end
+    
+            -- Check for collisions
+            if car.collidedWith == 0 then
+                addMessage("Collision", -1)
+                state.collided = true
+    
+                if totalScore > highestScore then
+                    highestScore = math.floor(totalScore)
+                    ac.sendChatMessage("Scored " .. totalScore .. " points.")
+                end
+                totalScore = 0
+                comboMeter = 1
+            end
+    
+            -- Check for overtakes
+            if not state.overtakeMessageDisplayed and not state.collided and state.drivingAlong then
+                local posDir = (car.pos - player.pos):normalize()
+                local posDot = math.dot(posDir, car.look)
+                state.maxPosDot = state.maxPosDot or -1
+                if posDot < -0.5 and state.maxPosDot > 0.5 then
+                    local distance = car.pos:distance(player.pos)
+                    if distance < 4 and distance >= 2.5 then  -- Near hit overtake
+                        totalScore = totalScore + math.ceil(15 * comboMeter)
+                        comboMeter = comboMeter + 1.5
+                        comboColor = comboColor + 120
+                        addMessage("Near Hit Overtake!", 1)
+                        ac.debug("Near hit overtake", distance)
+                    else  -- Normal overtake
+                        totalScore = totalScore + math.ceil(10 * comboMeter)
+                        comboMeter = comboMeter + 1
+                        comboColor = comboColor + 90
+                        addMessage("Overtake", comboMeter > 20 and 1 or 0)
+                    end
+                    state.overtakeMessageDisplayed = true  -- Mark overtaken in this cycle
+                end
+            end
         else
-            comboMeter = comboMeter + 1
-            addMessage("Near miss: bonus combo", 0)
+            -- Reset state when not close to player
+            state.maxPosDot = -1
+            state.overtakeMessageDisplayed = false
+            state.overtaken = false
+            state.collided = false
+            state.drivingAlong = true
+            state.nearMiss = false
         end
-        ac.debug("Near miss detected", car.pos:distance(player.pos))
     end
 end
-
--- Function to handle collisions
-local function handleCollision(state)
-    if not state.collided then
-        addMessage("Collision", -1)
-        state.collided = true
-        handleScoreReset()
-    end
-end
-
--- Function to handle overtakes
-local function handleOvertake(car, player, state)
-    local posDir = (car.pos - player.pos):normalize()
-    local posDot = math.dot(posDir, car.look)
-    state.maxPosDot = state.maxPosDot or -1
-    if posDot < -0.5 and state.maxPosDot > 0.5 then
-        local distance = car.pos:distance(player.pos)
-        if distance < 4 and distance >= 2.5 then  -- Near hit overtake
-            totalScore = totalScore + math.ceil(15 * comboMeter)
-            comboMeter = comboMeter + 1.5
-            comboColor = comboColor + 120
-            addMessage("Near Hit Overtake!", 1)
-            ac.debug("Near hit overtake", distance)
-        else  -- Normal overtake
-            totalScore = totalScore + math.ceil(10 * comboMeter)
-            comboMeter = comboMeter + 1
-            comboColor = comboColor + 90
-            addMessage("Overtake", comboMeter > 20 and 1 or 0)
-        end
-        state.overtakeMessageDisplayed = true  -- Mark overtaken in this cycle
-    end
-end
-
--- Function to reset car state when not close to player
-local function resetCarState(state)
-    state.maxPosDot = -1
-    state.overtakeMessageDisplayed = false
-    state.overtaken = false
-    state.collided = false
-    state.drivingAlong = true
-    state.nearMiss = false
-end
-
--- Function to handle game over conditions
-local function handleGameOver()
-    if totalScore > highestScore then
-        highestScore = math.floor(totalScore)
-        ac.sendChatMessage("Scored " .. totalScore .. " points.")
-    end
-    totalScore = 0
-    comboMeter = 1
-end
-
--- Function to update messages and glitter effects
 local function updateMessages(dt)
     comboColor = (comboColor + dt * 10 * comboMeter) % 360
     
@@ -214,7 +177,6 @@ local function updateMessages(dt)
         m.age = m.age + dt
         m.currentPos = math.applyLag(m.currentPos, m.targetPos, 0.8, dt)
     end
-
     for i = glitterCount, 1, -1 do
         local g = glitter[i]
         g.pos:add(g.velocity)
@@ -226,33 +188,34 @@ local function updateMessages(dt)
             glitterCount = glitterCount - 1
         end
     end
-
     if comboMeter > 10 and math.random() > 0.98 then
         addGlitter(math.floor(comboMeter), vec2(195, 75))
     end
 end
-
--- Function to draw UI elements
+local function speedMeter(ref)
+    ui.drawRectFilled(ref + vec2(0, -4), ref + vec2(180, 5), rgbm(0.4, 0.4, 0.4, 1), 1)
+    ui.drawLine(ref + vec2(0, -4), ref + vec2(0, 4), rgbm(0.7, 0.7, 0.7, 1), 1)
+    ui.drawLine(ref + vec2(requiredSpeed, -4), ref + vec2(requiredSpeed, 4), rgbm(0.7, 0.7, 0.7, 1), 1)
+    local speed = math.min(ac.getCarState(1).speedKmh, 180)
+    if speed > 1 then
+        ui.drawLine(ref + vec2(0, 0), ref + vec2(speed, 0), rgbm.new(hsv(speed / 180 * 120, 1, 1):rgb(), 1), 4)
+    end
+end
 function script.drawUI()
     local uiState = ac.getUiState()
     local player = ac.getCarState(1)
     updateMessages(uiState.dt)
-
     local speedRelative = math.saturate(math.floor(player.speedKmh) / requiredSpeed)
     speedWarning = math.applyLag(speedWarning, speedRelative < 1 and 1 or 0, 0.5, uiState.dt)
-
     local colorCombo = rgbm.new(hsv(comboColor, math.saturate(comboMeter / 10), 1):rgb(), math.saturate(comboMeter / 4))
-
     ui.beginTransparentWindow("overtakeScore", vec2(100, 100), vec2(400 * 1.5, 400 * 1.5))
     ui.beginOutline()
-
     ui.pushStyleVar(ui.StyleVar.Alpha, 1 - speedWarning)
     ui.pushFont(ui.Font.Title)
     ui.text('No Hesi Just Drive')
     ui.text("Highest Score: " .. highestScore .. " pts")
     ui.popFont()
     ui.popStyleVar()
-
     ui.pushFont(ui.Font.Title)
     ui.text(totalScore .. " pts")
     ui.sameLine(0, 20)
@@ -263,7 +226,6 @@ function script.drawUI()
     end
     ui.popFont()
     ui.endOutline(rgbm(0, 0, 0, 0.3))
-
     ui.offsetCursorY(20)
     ui.pushFont(ui.Font.Main)
     local startPos = ui.getCursor()
@@ -284,47 +246,12 @@ function script.drawUI()
     end
     ui.popFont()
     ui.setCursor(startPos + vec2(0, 4 * 30))
-
     ui.pushStyleVar(ui.StyleVar.Alpha, speedWarning)
     ui.setCursorY(0)
     ui.pushFont(ui.Font.Main)
     ui.textColored("Keep speed above " .. requiredSpeed .. " km/h:", rgbm.new(hsv(speedRelative * 120, 1, 1):rgb(), 1))
     speedMeter(ui.getCursor() + vec2(-9 * 0.5, 4 * 0.2))
-
     ui.popFont()
     ui.popStyleVar()
-
     ui.endTransparentWindow()
-end
-
--- Function to draw speed meter UI
-local function speedMeter(ref)
-    ui.drawRectFilled(ref + vec2(0, -4), ref + vec2(180, 5), rgbm(0.4, 0.4, 0.4, 1), 1)
-    ui.drawLine(ref + vec2(0, -4), ref + vec2(0, 4), rgbm(0.7, 0.7, 0.7, 1), 1)
-    ui.drawLine(ref + vec2(requiredSpeed, -4), ref + vec2(requiredSpeed, 4), rgbm(0.7, 0.7, 0.7, 1), 1)
-
-    local speed = math.min(ac.getCarState(1).speedKmh, 180)
-    if speed > 1 then
-        ui.drawLine(ref + vec2(0, 0), ref + vec2(speed, 0), rgbm.new(hsv(speed / 180 * 120, 1, 1):rgb(), 1), 4)
-    end
-end
-
--- Main script functions
-
-function script.prepare(dt)
-    -- Check if the player's car speed is above 60 km/h to start the script
-    return ac.getCarState(1).speedKmh > 60
-end
-
-function script.update(dt)
-    -- Increment time passed
-    timePassed = timePassed + dt
-
-    -- Update the game logic
-    updateGameLogic(dt)
-end
-
-function script.drawUI()
-    -- Draw the game UI
-    drawGameUI()
 end
