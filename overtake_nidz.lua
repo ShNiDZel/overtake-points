@@ -1,5 +1,5 @@
 -- Author: NiDZ (Modified by Assistant)
--- Version: 0.1.4
+-- Version: 0.1.5
 
 local math = math
 local vec2 = vec2
@@ -147,7 +147,6 @@ function script.update(dt)
                 totalScore = 0
                 comboMeter = 1
             end
-
             if not state.overtaken and not state.collided and state.drivingAlong then
                 local posDir = (car.pos - player.pos):normalize()
                 local posDot = math.dot(posDir, car.look)
@@ -156,15 +155,11 @@ function script.update(dt)
                     local distance = car.pos:distance(player.pos)
                     if distance < 4 and distance >= 2.5 then  -- Near hit overtake
                         totalScore = totalScore + math.ceil(10 * comboMeter)
-                        comboMeter = comboMeter + math.max(1, 1.5 / (comboMeter / 5 + 1))
-                        comboColor = comboColor + 120
-                        addMessage("That's So Close!", comboMeter > 20 and 1 or 0)
+                        addMessage("Near Hit Overtake", 1)
                         ac.debug("Near hit overtake", distance)
                     else  -- Normal overtake
                         totalScore = totalScore + math.ceil(10 * comboMeter)
-                        comboMeter = comboMeter + math.max(1, 1 / (comboMeter / 5 + 1))
-                        comboColor = comboColor + 90
-                        addMessage("Nice Overtake", comboMeter > 20 and 1 or 0)
+                        addMessage("Overtake", 0)
                     end
                     state.overtaken = true
                 end
@@ -182,14 +177,34 @@ end
 local messages = {}
 local glitter = {}
 local glitterCount = 0
+local nearHitMessages = {
+    "That's So Close!",
+    "Near Miss!",
+    "Almost There!",
+    "Close Call!"
+}
+local normalOvertakeMessages = {
+    "Nice Overtake!",
+    "Smooth Move!",
+    "Great Pass!",
+    "Well Done!"
+}
 
-function addMessage(text, mood)
+local function addMessage(text, mood)
     for i = math.min(#messages + 1, 4), 2, -1 do
         messages[i] = messages[i - 1]
         messages[i].targetPos = i
     end
-    messages[1] = {text = text, age = 0, targetPos = 1, currentPos = 1, mood = mood}
+    
+    local randomIndex = math.random(#nearHitMessages)
+    local messageText = text
+    
     if mood == 1 then
+        messageText = nearHitMessages[randomIndex]
+        comboMeter = comboMeter + 1.5
+        comboColor = comboColor + 120
+        
+        -- Add glitter effect for near hit overtake
         for i = 1, 60 do
             local dir = vec2(math.random() - 0.5, math.random() - 0.5)
             glitterCount = glitterCount + 1
@@ -200,7 +215,15 @@ function addMessage(text, mood)
                 life = 0.5 + 0.5 * math.random()
             }
         end
+    elseif mood == 0 then
+        messageText = normalOvertakeMessages[randomIndex]
+        comboMeter = comboMeter + 1
+        comboColor = comboColor + 90
     end
+    
+    messages[1] = {text = messageText, age = 0, targetPos = 1, currentPos = 1, mood = mood}
+    
+    ac.debug("Message added", messageText, mood)
 end
 
 local function updateMessages(dt)
