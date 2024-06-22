@@ -1,8 +1,8 @@
 -- Author: NiDZ
--- Version: 0.5
+-- Version: 0.6
 
 -- Constants
-local requiredSpeed = 50
+local requiredSpeed = 35
 
 -- Game State Variables
 local timePassed = 0
@@ -41,7 +41,8 @@ local function handleNearMiss(car, player, state)
     local nearMissThreshold = 2
     local veryCloseNearMissThreshold = 1.5
 
-    if car.pos:closerToThan(player.pos, nearMissThreshold) then
+    -- Check if the near miss condition is met
+    if not state.nearMiss and car.pos:closerToThan(player.pos, nearMissThreshold) then
         if car.pos:closerToThan(player.pos, veryCloseNearMissThreshold) then
             totalScore = totalScore + math.ceil(10 * comboMeter)
             comboMeter = comboMeter + 3
@@ -59,15 +60,17 @@ end
 
 -- Function to handle collisions
 local function handleCollision(state)
-    addMessage("Collision", -1)
-    state.collided = true
+    if not state.collided then
+        addMessage("Collision", -1)
+        state.collided = true
 
-    if totalScore > highestScore then
-        highestScore = math.floor(totalScore)
-        ac.sendChatMessage("scored " .. totalScore .. " points.")
+        if totalScore > highestScore then
+            highestScore = math.floor(totalScore)
+            ac.sendChatMessage("scored " .. totalScore .. " points.")
+        end
+        totalScore = 0
+        comboMeter = 1
     end
-    totalScore = 0
-    comboMeter = 1
 end
 
 -- Function to handle overtakes and near hits during overtaking
@@ -77,16 +80,16 @@ local function handleOvertake(car, player, state)
     state.maxPosDot = math.max(state.maxPosDot, posDot)
 
     -- Check for near hit during overtaking
-    local nearHitThreshold = 2
+    local nearHitThreshold = 1.0
     if car.pos:closerToThan(player.pos, nearHitThreshold) then
         totalScore = totalScore + math.ceil(5 * comboMeter)
-        comboMeter = comboMeter + 3
+        comboMeter = comboMeter + 1
         comboColor = comboColor + 90
         addMessage("Near hit during overtaking", comboMeter > 10 and 1 or 0)
     end
 
     -- Check for successful overtake
-    if posDot < -1.5 and state.maxPosDot > 1.5 then
+    if posDot < -0.5 and state.maxPosDot > 0.5 then
         totalScore = totalScore + math.ceil(20 * comboMeter)
         comboMeter = comboMeter + 2
         comboColor = comboColor + 90
@@ -176,6 +179,7 @@ function script.update(dt)
             if not drivingAlong then
                 state.drivingAlong = false
 
+                -- Only handle near miss if it hasn't been handled yet
                 if not state.nearMiss then
                     handleNearMiss(car, player, state)
                 end
