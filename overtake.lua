@@ -234,12 +234,12 @@ local speedWarning = 0
             end
         end
 
-        ui.beginTransparentWindow("overtakeScore", vec2(100, 100), vec2(400 * 0.5, 400 * 0.5))
+        ui.beginTransparentWindow("overtakeScore", vec2(200, 200), vec2(400 * 0.5, 400 * 0.5))
         ui.beginOutline()
 
         ui.pushStyleVar(ui.StyleVar.Alpha, 1 - speedWarning)
         ui.pushFont(ui.Font.Main)
-        ui.text('Made By Atilxor\'')
+        ui.text('NiDZ No Hesi')
         ui.text("Highest Score: " .. highestScore .. " pts")
         ui.popFont()
         ui.popStyleVar()
