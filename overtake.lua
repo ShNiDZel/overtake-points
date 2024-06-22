@@ -2,7 +2,7 @@
 -- Version: 0.5
 
 -- Constants
-local requiredSpeed = 35
+local requiredSpeed = 50
 
 -- Game State Variables
 local timePassed = 0
@@ -70,11 +70,22 @@ local function handleCollision(state)
     comboMeter = 1
 end
 
--- Function to handle overtakes
+-- Function to handle overtakes and near hits during overtaking
 local function handleOvertake(car, player, state)
     local posDir = (car.pos - player.pos):normalize()
     local posDot = math.dot(posDir, car.look)
     state.maxPosDot = math.max(state.maxPosDot, posDot)
+
+    -- Check for near hit during overtaking
+    local nearHitThreshold = 1.0
+    if car.pos:closerToThan(player.pos, nearHitThreshold) then
+        totalScore = totalScore + math.ceil(5 * comboMeter)
+        comboMeter = comboMeter + 1
+        comboColor = comboColor + 90
+        addMessage("Near hit during overtaking", comboMeter > 10 and 1 or 0)
+    end
+
+    -- Check for successful overtake
     if posDot < -0.5 and state.maxPosDot > 0.5 then
         totalScore = totalScore + math.ceil(20 * comboMeter)
         comboMeter = comboMeter + 2
