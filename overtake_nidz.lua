@@ -1,5 +1,5 @@
 -- Author: NiDZ (Modified by Assistant)
--- Version: 0.1.3
+-- Version: 0.1.4
 
 local math = math
 local vec2 = vec2
@@ -151,11 +151,11 @@ function script.update(dt)
             if not state.overtaken and not state.collided and state.drivingAlong then
                 local posDir = (car.pos - player.pos):normalize()
                 local posDot = math.dot(posDir, car.look)
-                state.maxPosDot = math.max(state.maxPosDot, posDot)
+                state.maxPosDot = math.max(state.maxPosDot or -1, posDot)
                 if posDot < -0.5 and state.maxPosDot > 0.5 then
                     local distance = car.pos:distance(player.pos)
-                    if distance < -0.2 and distance >= 0.2 then  -- Near hit overtake
-                        totalScore = totalScore + math.ceil(15 * comboMeter)
+                    if distance < 4 and distance >= 2.5 then  -- Near hit overtake
+                        totalScore = totalScore + math.ceil(10 * comboMeter)
                         comboMeter = comboMeter + 3.5
                         comboColor = comboColor + 120
                         addMessage("Near Hit Overtake!", comboMeter > 20 and 1 or 0)
