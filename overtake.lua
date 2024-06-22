@@ -1,212 +1,158 @@
 -- Author: NiDZ
--- Version: 0.9.2.1
+-- Version: 1.0
 
 -- Constants
-local requiredSpeed = 25
+local requiredSpeed = 35    -- Speed required to avoid penalty
+local nearMissThreshold = 3  -- Distance threshold for near miss
+local nearHitThreshold = 1.5 -- Distance threshold for near hit
+local slipstreamThreshold = 5 -- Distance threshold for slipstreaming
+local overtakeDotThreshold = 0.5 -- Dot product threshold for overtaking
 
--- Game State Variables
-local timePassed = 0
-local totalScore = 0
-local comboMeter = 1
-local comboColor = 0
-local highestScore = 0
-local dangerouslySlowTimer = 0
-local carsState = {}
-local wheelsWarningTimeout = 0
+-- Variables
+local totalScore = 0        -- Total score accumulated
+local comboMeter = 1        -- Combo meter starting value
+local highestScore = 0      -- Highest score achieved
+local dangerouslySlowTimer = 0   -- Timer for penalties when speed is too low
+local wheelsWarningTimeout = 0   -- Timer for warnings when wheels are outside
+local carsState = {}        -- State tracking for each car in simulation
 
--- Utility function to initialize car state
-local function initializeCarState(index)
-    carsState[index] = {
-        maxPosDot = -1,
-        overtaken = false,
-        collided = false,
-        drivingAlong = true,
-        nearMissHandled = false,  -- Track if near miss has been handled
-        nearHitOvertakeHandled = false  -- Track if near hit during overtaking has been handled
-    }
+-- Storage for highest score
+local stored = { playerscore = ac.storage('playerscore', highestScore) }
+highestScore = stored.playerscore:get()  -- Load highest score from storage
+
+-- Function to send highest score to connected clients
+local function sendHighscore(connectedCarIndex, connectedSessionID)
+    ac.sendChatMessage("Highscore: " .. highestScore .. " pts.")
+end
+ac.onClientConnected(sendHighscore)
+
+-- Function to reset score if current score surpasses highest score
+local function resetScore()
+    if totalScore > highestScore then
+        highestScore = math.floor(totalScore)
+        stored.playerscore:set(highestScore)
+        ac.sendChatMessage("NEW highscore: " .. totalScore .. " pts.")
+    end
+    totalScore, comboMeter = 0, 1  -- Reset total score and combo meter
 end
 
--- Prepare function to run before the main start
-function script.prepare(dt)
-    -- Initialize carsState for existing cars at the start
-    local sim = ac.getSimState()
-    for i = 1, sim.carsCount do
-        initializeCarState(i)
-    end
-end
-
--- Function to handle near misses
-local function handleNearMiss(car, player, state)
-    local nearMissThreshold = 5
-    local veryCloseNearMissThreshold = 3
-
-    -- Check if the near miss condition is met
-    if not state.nearMissHandled and car.pos:closerToThan(player.pos, nearMissThreshold) then
-        if car.pos:closerToThan(player.pos, veryCloseNearMissThreshold) then
-            totalScore = totalScore + math.ceil(10 * comboMeter)
-            comboMeter = comboMeter + 3
-            comboColor = comboColor + 90
-            addMessage("Very close near miss!", comboMeter > 10 and 1 or 0)
-        else
-            totalScore = totalScore + math.ceil(15 * comboMeter)
-            comboMeter = comboMeter + 1
-            comboColor = comboColor + 90
-            addMessage("Near miss: bonus combo", comboMeter > 15 and 1 or 0)
-        end
-        state.nearMissHandled = true
-    end
-end
-
--- Function to handle collisions
-local function handleCollision(car, player, state)
-    if not state.collided and car.collidedWith == 0 then
-        addMessage("Collision", -1)
-        state.collided = true
-
-        if totalScore > highestScore then
-            highestScore = math.floor(totalScore)
-            ac.sendChatMessage("Score " .. totalScore .. " Total Points")
-        end
-        totalScore = 0
-        comboMeter = 1
-    end
-end
-
--- Function to handle overtakes and near hits during overtaking
-local function handleOvertake(car, player, state)
-    local posDir = (car.pos - player.pos):normalize()
-    local posDot = math.dot(posDir, car.look)
-    state.maxPosDot = math.max(state.maxPosDot, posDot)
-
-    -- Check for near hit during overtaking
-    local nearHitThreshold = 2.0
-    if not state.nearHitOvertakeHandled and car.pos:closerToThan(player.pos, nearHitThreshold) then
-        totalScore = totalScore + math.ceil(5 * comboMeter)
-        comboMeter = comboMeter + 1
-        comboColor = comboColor + 90
-        addMessage("Near hit during overtaking", comboMeter > 10 and 1 or 0)
-        state.nearHitOvertakeHandled = true
-    end
-
-    -- Check for successful overtake
-    if posDot < -0.5 and state.maxPosDot > 0.5 then
-        totalScore = totalScore + math.ceil(20 * comboMeter)
-        comboMeter = comboMeter + 2
-        comboColor = comboColor + 90
-        addMessage("Overtake", comboMeter > 20 and 1 or 0)
-        state.overtaken = true
-    end
-end
-
--- Main update function to be called every frame
-function script.update(dt)
-    -- When time passes 0, display the "Start!" message
-    if timePassed == 0 then
-        addMessage("Lets GO!!!", 0)
-    end
-
-    -- Get the car state
+-- Function to check if player's speed is too low and apply penalties
+local function checkSpeed(dt)
     local player = ac.getCarState(1)
-
-    -- If the engine life is less than 1
-    if player.engineLifeLeft < 1 then
-        -- If the score is higher than the previous one
-        if totalScore > highestScore then
-            highestScore = math.floor(totalScore)
-            -- Send in-game chat to the server
-            ac.sendChatMessage("Score " .. totalScore .. " Total Points")
+    if player.speedKmh < requiredSpeed then
+        dangerouslySlowTimer = dangerouslySlowTimer + dt
+        -- Penalize if speed is low for too long
+        if dangerouslySlowTimer > 3 then
+            resetScore()
+        elseif dangerouslySlowTimer == dt then
+            addMessage("Too Slow", -1)  -- Example function call, assumed elsewhere
         end
-        -- Reset everything when total score is 0
-        totalScore = 0
-        comboMeter = 1
+        comboMeter = 1  -- Reset combo meter if speed is low
+        return true
+    else
+        dangerouslySlowTimer = 0
+        return false
+    end
+end
+
+-- Function to update combo meter based on player's speed and actions
+local function updateCombo(dt, player)
+    -- Adjust combo meter based on speed and other factors
+    comboMeter = math.max(1, comboMeter - dt * (0.5 * math.lerp(1, 0.1, math.lerpInvSat(player.speedKmh, 80, 200)) + player.wheelsOutside))
+end
+
+-- Main update function called every frame
+function script.update(dt)
+    local player = ac.getCarState(1)  -- Get state of the player's car
+
+    -- Check if player's car is destroyed (example condition)
+    if player.engineLifeLeft < 1 then
+        resetScore()  -- Reset score if engine is destroyed
         return
     end
 
-    -- Increase the time elapsed from the last frame
-    timePassed = timePassed + dt
+    updateCombo(dt, player)  -- Update combo meter based on current speed and actions
 
-    -- Calculate combo fading rate based on time and car speed
-    local comboFadingRate = 0.5 * math.lerp(1, 0.1, math.lerpInvSat(player.speedKmh, 80, 200)) + player.wheelsOutside
-    comboMeter = math.max(1, comboMeter - dt * comboFadingRate)
+    local sim = ac.getSimState()  -- Get state of the simulation
 
-    -- Get the simulation state
-    local sim = ac.getSimState()
+    -- Ensure carsState array is ready for all cars in simulation
+    for i = #carsState + 1, sim.carsCount do
+        carsState[i] = {}  -- Initialize state for new cars in the simulation
+    end
 
-    -- Decrease the wheels warning timeout if it is greater than 0
+    -- Handle warning for wheels outside the track
     if wheelsWarningTimeout > 0 then
         wheelsWarningTimeout = wheelsWarningTimeout - dt
     elseif player.wheelsOutside > 0 then
-        -- Display a warning message if the car's wheels are outside the track
         if wheelsWarningTimeout == 0 then
-            addMessage("Car is outside", -1)
+            addMessage("Car is outside", -1)  -- Example function call, assumed elsewhere
+            wheelsWarningTimeout = 60
         end
-        wheelsWarningTimeout = 60
     end
 
-    -- Check if the player's speed is below the required speed
-    if player.speedKmh < requiredSpeed then
-        if dangerouslySlowTimer > 3 then
-            if totalScore > highestScore then
-                highestScore = math.floor(totalScore)
-                ac.sendChatMessage("scored " .. totalScore .. " points.")
-            end
-            totalScore = 0
-            comboMeter = 1
-        else
-            if dangerouslySlowTimer == 0 then
-                addMessage("Too Slow BRO!!!", -1)
-            end
-        end
-        dangerouslySlowTimer = dangerouslySlowTimer + dt
-        comboMeter = 1
-        return
-    else
-        dangerouslySlowTimer = 0
-    end
+    -- Check if player's speed is too low
+    if checkSpeed(dt) then return end
 
-    -- Process each car in the simulation
+    -- Loop through all cars in the simulation
     for i = 1, sim.carsCount do
-        local car = ac.getCarState(i)
-        local state = carsState[i]
+        local car, state = ac.getCarState(i), carsState[i]
 
-        -- Reset near miss handling flag if car is no longer close
-        if not car.pos:closerToThan(player.pos, 10) then
-            state.nearMissHandled = false
-        end
-
-        -- Reset near hit overtaking handling flag if car is no longer close or overtaken
-        if not car.pos:closerToThan(player.pos, 10) or state.overtaken then
-            state.nearHitOvertakeHandled = false
-        end
-
+        -- Check if the car is close to the player
         if car.pos:closerToThan(player.pos, 10) then
-            local drivingAlong = math.dot(car.look, player.look) > 0.5
-            if not drivingAlong then
-                state.drivingAlong = false
+            local drivingAlong = math.dot(car.look, player.look) > 0.2
 
-                -- Only handle near miss if it hasn't been handled yet
-                if not state.nearMissHandled then
-                    handleNearMiss(car, player, state)
+            -- Handle near misses
+            if not drivingAlong and not state.nearMiss and car.pos:closerToThan(player.pos, nearMissThreshold) then
+                state.nearMiss = true
+                if car.pos:closerToThan(player.pos, nearHitThreshold) then
+                    comboMeter = comboMeter + 3
+                    totalScore = totalScore + 10  -- Add points for very close near miss
+                    addMessage("Very close near miss!", 1)  -- Example function call, assumed elsewhere
+                else
+                    comboMeter = comboMeter + 1
+                    totalScore = totalScore + 5  -- Add points for near miss
+                    addMessage("Near miss: bonus combo", 0)  -- Example function call, assumed elsewhere
                 end
             end
 
-            -- Check and handle collision only if not already handled
-            if not state.collided then
-                handleCollision(car, player, state)
+            -- Handle collisions
+            if car.collidedWith == 0 then
+                addMessage("Collision", -1)  -- Example function call, assumed elsewhere
+                state.collided = true
+                resetScore()  -- Reset score if collision occurs
             end
 
-            -- Only handle overtake if the car is not collided and driving along
+            -- Handle overtakes
             if not state.overtaken and not state.collided and state.drivingAlong then
-                handleOvertake(car, player, state)
+                local posDir = (car.pos - player.pos):normalize()
+                local posDot = math.dot(posDir, car.look)
+                state.maxPosDot = math.max(state.maxPosDot or -1, posDot)
+                if posDot < -overtakeDotThreshold and state.maxPosDot > overtakeDotThreshold then
+                    totalScore = totalScore + math.ceil(10 * comboMeter)
+                    comboMeter = comboMeter + 1
+                    addMessage("Overtake", comboMeter > 20 and 1 or 0)  -- Example function call, assumed elsewhere
+                    state.overtaken = true
+                end
+            end
+
+            -- Handle near hits
+            if not state.nearHit and car.pos:closerToThan(player.pos, nearHitThreshold) then
+                state.nearHit = true
+                totalScore = totalScore + 5  -- Add points for near hit
+                comboMeter = comboMeter + 1
+                addMessage("Near hit", comboMeter > 20 and 1 or 0)  -- Example function call, assumed elsewhere
+            end
+
+            -- Handle slipstreaming (drafting)
+            if not state.slipstreaming and car.pos:closerToThan(player.pos, slipstreamThreshold) and drivingAlong then
+                state.slipstreaming = true
+                totalScore = totalScore + 2  -- Add points for slipstreaming
+                comboMeter = comboMeter + 1
+                addMessage("Slipstreaming", comboMeter > 20 and 1 or 0)  -- Example function call, assumed elsewhere
             end
         else
-            -- Reset state if the car is no longer close to the player
-            state.maxPosDot = -1
-            state.overtaken = false
-            state.collided = false
-            state.drivingAlong = true
-            state.nearMissHandled = false
-            state.nearHitOvertakeHandled = false
+            -- Reset state if car is no longer close to player
+            state.maxPosDot, state.overtaken, state.collided, state.drivingAlong, state.nearMiss, state.nearHit, state.slipstreaming = -1, false, false, true, false, false, false
         end
     end
 end
