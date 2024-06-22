@@ -251,11 +251,11 @@ local speedWarning = 0
             end
         end
 
-        ui.beginTransparentWindow("overtakeScore", vec2(150, 150), vec2(400 * 1.5, 400 * 1.5))
+        ui.beginTransparentWindow("overtakeScore", vec2(200, 200), vec2(600 * 1.5, 600 * 1.5))
         ui.beginOutline()
 
         ui.pushStyleVar(ui.StyleVar.Alpha, 1 - speedWarning)
-        ui.pushFont(ui.Font.Title)
+        ui.pushFont(ui.Font.Header)
         ui.text('NiDZ No Hesi')
         ui.text("Highest Score: " .. highestScore .. " pts")
         ui.popFont()
