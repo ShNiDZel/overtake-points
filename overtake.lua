@@ -1,5 +1,5 @@
 -- Author: NiDZ
--- Version: 0.8
+-- Version: 0.9
 
 -- Constants
 local requiredSpeed = 50
@@ -58,8 +58,8 @@ local function handleNearMiss(car, player, state)
 end
 
 -- Function to handle collisions
-local function handleCollision(state)
-    if not state.collided then
+local function handleCollision(car, player, state)
+    if not state.collided and car.collidedWith ~= 0 then
         addMessage("Collision", -1)
         state.collided = true
 
@@ -195,9 +195,11 @@ function script.update(dt)
                 end
             end
 
-            if car.collidedWith == 0 then
-                handleCollision(state)
-            elseif not state.overtaken and not state.collided and state.drivingAlong then
+            -- Check and handle collision
+            handleCollision(car, player, state)
+
+            -- Only handle overtake if the car is not collided and driving along
+            if not state.overtaken and not state.collided and state.drivingAlong then
                 handleOvertake(car, player, state)
             end
         else
