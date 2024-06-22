@@ -1,5 +1,5 @@
--- Author: NiDZ
--- Version: 0.1.1
+-- Author: NiDZ (Modified by Assistant)
+-- Version: 0.1.2
 
 local math = math
 local vec2 = vec2
@@ -38,8 +38,6 @@ local function addMessage(text, mood)
     if mood == 1 then
         addGlitter(60)
     end
-    
-    -- Add debug output
     ac.debug("Message added", text, mood)
 end
 
@@ -134,7 +132,6 @@ function script.update(dt)
                         addMessage("Near miss: bonus combo", 0)
                     end
                     
-                    -- Add debug output
                     ac.debug("Near miss detected", car.pos:distance(player.pos))
                 end
             end
@@ -156,10 +153,19 @@ function script.update(dt)
                 local posDot = math.dot(posDir, car.look)
                 state.maxPosDot = math.max(state.maxPosDot, posDot)
                 if posDot < -0.5 and state.maxPosDot > 0.5 then
-                    totalScore = totalScore + math.ceil(10 * comboMeter)
-                    comboMeter = comboMeter + 1
-                    comboColor = comboColor + 90
-                    addMessage("Overtake", comboMeter > 20 and 1 or 0)
+                    local distance = car.pos:distance(player.pos)
+                    if distance < 4 and distance >= 2.5 then  -- Near hit overtake
+                        totalScore = totalScore + math.ceil(15 * comboMeter)
+                        comboMeter = comboMeter + 1.5
+                        comboColor = comboColor + 120
+                        addMessage("Near Hit Overtake!", 1)
+                        ac.debug("Near hit overtake", distance)
+                    else  -- Normal overtake
+                        totalScore = totalScore + math.ceil(10 * comboMeter)
+                        comboMeter = comboMeter + 1
+                        comboColor = comboColor + 90
+                        addMessage("Overtake", comboMeter > 20 and 1 or 0)
+                    end
                     state.overtaken = true
                 end
             end
@@ -223,7 +229,7 @@ function script.drawUI()
     ui.beginOutline()
 
     ui.pushStyleVar(ui.StyleVar.Alpha, 1 - speedWarning)
-    ui.pushFont(ui.Font.Main)
+    ui.pushFont(ui.Font.Title)
     ui.text('No Hesi Just Drive')
     ui.text("Highest Score: " .. highestScore .. " pts")
     ui.popFont()
@@ -250,8 +256,6 @@ function script.drawUI()
             m.text,
             m.mood == 1 and rgbm(0, 1, 0, f) or m.mood == -1 and rgbm(1, 0, 0, f) or rgbm(1, 1, 1, f)
         )
-        
-        -- Add debug output
         ac.debug("Displaying message", m.text, m.age, m.currentPos)
     end
     for i = 1, glitterCount do
