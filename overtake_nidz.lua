@@ -1,5 +1,5 @@
 -- Author: NiDZ (Modified by Assistant)
--- Version: 0.1.5.6
+-- Version: 0.1.5.2
 
 local math = math
 local vec2 = vec2
@@ -97,10 +97,8 @@ function script.update(dt)
     if player.engineLifeLeft < 1 then
         if totalScore > highestScore then
             highestScore = math.floor(totalScore)
-            serverScores[playerName] = highestScore
-            sendScore()  -- Send the new high score to the server
-            updatePlayerRanking()
             ac.sendChatMessage("Scored " .. highestScore .. " points.")
+            sendScore()  -- Send the new high score to the server
         end
         totalScore = 0
         comboMeter = 1
@@ -147,12 +145,12 @@ function script.update(dt)
         dangerouslySlowTimer = 0
     end
 
-    --if totalScore > highestScore then
+    if totalScore > highestScore then
         highestScore = math.floor(totalScore)
         serverScores[playerName] = highestScore
         sendScore()  -- Send the new high score to the server
         updatePlayerRanking()
-    --end
+    end
 
     for i = 1, sim.carsCount do
         local car = ac.getCarState(i)
@@ -316,8 +314,8 @@ local speedWarning = 0
     
         ui.pushStyleVar(ui.StyleVar.Alpha, 1 - speedWarning)
         ui.pushFont(ui.Font.Title)
-        ui.text('Gareba No Hesi')
-        ui.text("PB: " .. highestScore .. " pts")
+        ui.text('No HESI BABY!!!')
+        ui.text("Highest Score: " .. highestScore .. " pts")
         ui.text("Current Score: " .. math.floor(totalScore) .. " pts")
         ui.text("Your Ranking: " .. playerRanking .. " / " .. table.count(serverScores))
         ui.popFont()
