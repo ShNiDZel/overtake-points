@@ -1,5 +1,5 @@
 -- Author: NiDZ (Modified by Assistant)
--- Version: 0.1.5.2
+-- Version: 0.1.6
 
 local math = math
 local vec2 = vec2
@@ -27,6 +27,22 @@ local highestScore = 0
 local playerRanking = 1
 local serverScores = {}
 local playerName = ""
+
+local overtakeMessages = {
+    "Nice Overtake",
+    "Smooth Move",
+    "Perfect Pass",
+    "Slick Maneuver",
+    "Clean Overtake"
+}
+
+local nearHitOvertakeMessages = {
+    "That's So Close!",
+    "Cutting It Fine!",
+    "Threading the Needle!",
+    "Razor-thin Margin!",
+    "Daring Move!"
+}
 
 local function initializePlayer()
     playerName = ac.getDriverName(0)
@@ -84,6 +100,10 @@ local function addGlitter(count, pos)
             life = 0.5 + 0.5 * math.random()
         }
     end
+end
+
+local function getRandomMessage(messageArray)
+    return messageArray[math.random(#messageArray)]
 end
 
 function script.update(dt)
@@ -198,13 +218,13 @@ function script.update(dt)
                         totalScore = totalScore + math.ceil(10 * comboMeter)
                         comboMeter = comboMeter + 3.5
                         comboColor = comboColor + 120
-                        addMessage("That's So Close!", comboMeter > 20 and 1 or 0)
+                        addMessage(getRandomMessage(nearHitOvertakeMessages), comboMeter > 20 and 1 or 0)
                         ac.debug("Near hit overtake", distance)
                     else  -- Normal overtake
                         totalScore = totalScore + math.ceil(10 * comboMeter)
                         comboMeter = comboMeter + 3
                         comboColor = comboColor + 90
-                        addMessage("Nice Overtake", comboMeter > 20 and 1 or 0)
+                        addMessage(getRandomMessage(overtakeMessages), comboMeter > 20 and 1 or 0)
                     end
                     state.overtaken = true
                 end
