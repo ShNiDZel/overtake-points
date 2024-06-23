@@ -1,5 +1,5 @@
 -- Author: NiDZ (Modified by Assistant)
--- Version: 0.1.5.2
+-- Version: 0.1.5.3
 
 local math = math
 local vec2 = vec2
@@ -97,8 +97,10 @@ function script.update(dt)
     if player.engineLifeLeft < 1 then
         if totalScore > highestScore then
             highestScore = math.floor(totalScore)
-            ac.sendChatMessage("Scored " .. highestScore .. " points.")
+            serverScores[playerName] = highestScore
             sendScore()  -- Send the new high score to the server
+            updatePlayerRanking()
+            ac.sendChatMessage("Scored " .. highestScore .. " points.")
         end
         totalScore = 0
         comboMeter = 1
@@ -314,8 +316,8 @@ local speedWarning = 0
     
         ui.pushStyleVar(ui.StyleVar.Alpha, 1 - speedWarning)
         ui.pushFont(ui.Font.Title)
-        ui.text('No HESI BABY!!!')
-        ui.text("Highest Score: " .. highestScore .. " pts")
+        ui.text('Gareba No Hesi')
+        ui.text("PB: " .. highestScore .. " pts")
         ui.text("Current Score: " .. math.floor(totalScore) .. " pts")
         ui.text("Your Ranking: " .. playerRanking .. " / " .. table.count(serverScores))
         ui.popFont()
