@@ -1,5 +1,5 @@
 -- Author: NiDZ (Modified by Assistant)
--- Version: 0.1.5.5
+-- Version: 0.1.5.6
 
 local math = math
 local vec2 = vec2
@@ -36,6 +36,10 @@ end
 function script.prepare(dt)
     ac.debug("speed", ac.getCarState(1).speedKmh)
     return ac.getCarState(1).speedKmh > 60
+end
+
+local function sendScore()
+    ac.sendChatMessage("SCORE:" .. playerName .. ":" .. highestScore)
 end
 
 local function parseScoreMessage(message)
@@ -94,7 +98,7 @@ function script.update(dt)
         if totalScore > highestScore then
             highestScore = math.floor(totalScore)
             serverScores[playerName] = highestScore
-            ()  -- Send the new high score to the server
+            sendScore()  -- Send the new high score to the server
             updatePlayerRanking()
             ac.sendChatMessage("Scored " .. highestScore .. " points.")
         end
@@ -143,12 +147,12 @@ function script.update(dt)
         dangerouslySlowTimer = 0
     end
 
-    if totalScore > highestScore then
+    --if totalScore > highestScore then
         highestScore = math.floor(totalScore)
         serverScores[playerName] = highestScore
         sendScore()  -- Send the new high score to the server
         updatePlayerRanking()
-    end
+    --end
 
     for i = 1, sim.carsCount do
         local car = ac.getCarState(i)
