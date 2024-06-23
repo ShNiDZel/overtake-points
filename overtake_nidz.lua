@@ -1,5 +1,5 @@
 -- Author: NiDZ (Modified by Assistant)
--- Version: 0.1.4
+-- Version: 0.1.5
 
 local math = math
 local vec2 = vec2
@@ -23,10 +23,37 @@ local messages = {}
 local glitter = {}
 local glitterCount = 0
 local speedWarning = 0
+local highestScore = 0
+local playerRanking = 0
+local serverScores = {}
 
 function script.prepare(dt)
     ac.debug("speed", ac.getCarState(1).speedKmh)
     return ac.getCarState(1).speedKmh > 60
+end
+
+local function sendScore()
+    local playerName = ac.getDriverName(0)
+    ac.sendChatMessage("/score " .. playerName .. " " .. highestScore)
+end
+
+local function parseScoreMessage(message)
+    local name, score = message:match("/score (%S+) (%d+)")
+    if name and score then
+        serverScores[name] = tonumber(score)
+        updatePlayerRanking()
+    end
+end
+
+local function updatePlayerRanking()
+    local playerName = ac.getDriverName(0)
+    local ranking = 1
+    for name, score in pairs(serverScores) do
+        if name ~= playerName and score > highestScore then
+            ranking = ranking + 1
+        end
+    end
+    playerRanking = ranking
 end
 
 local function addMessage(text, mood)
@@ -65,7 +92,8 @@ function script.update(dt)
     if player.engineLifeLeft < 1 then
         if totalScore > highestScore then
             highestScore = math.floor(totalScore)
-            ac.sendChatMessage("Scored " .. totalScore .. " points.")
+            ac.sendChatMessage("Scored " .. highestScore .. " points.")
+            sendScore()  -- Send the new high score to the server
         end
         totalScore = 0
         comboMeter = 1
@@ -179,6 +207,10 @@ function script.update(dt)
     end
 end
 
+function script.onChatMessage(message)
+    parseScoreMessage(message)
+end
+
 local messages = {}
 local glitter = {}
 local glitterCount = 0
@@ -267,11 +299,12 @@ local speedWarning = 0
 
         ui.beginTransparentWindow("overtakeScore", vec2(200, 100), vec2(400 * 2.5, 400 * 2.5))
         ui.beginOutline()
-
+    
         ui.pushStyleVar(ui.StyleVar.Alpha, 1 - speedWarning)
         ui.pushFont(ui.Font.Title)
         ui.text('No HESI BABY!!!')
         ui.text("Highest Score: " .. highestScore .. " pts")
+        ui.text("Your Ranking: " .. playerRanking .. " / " .. #serverScores)
         ui.popFont()
         ui.popStyleVar()
 
