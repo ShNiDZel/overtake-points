@@ -1,5 +1,5 @@
 -- Author: NiDZ (Modified by Assistant)
--- Version: 0.1.5.1
+-- Version: 0.1.5.2
 
 local math = math
 local vec2 = vec2
@@ -39,12 +39,12 @@ function script.prepare(dt)
 end
 
 local function sendScore()
-    ac.sendChatMessage("/score " .. playerName .. " " .. highestScore)
+    ac.sendChatMessage("SCORE:" .. playerName .. ":" .. highestScore)
 end
 
 local function parseScoreMessage(message)
-    local name, score = message:match("/score (%S+) (%d+)")
-    if name and score then
+    local prefix, name, score = message:match("(SCORE:)(%S+):(%d+)")
+    if prefix == "SCORE:" and name and score then
         serverScores[name] = tonumber(score)
         updatePlayerRanking()
     end
