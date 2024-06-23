@@ -1,5 +1,5 @@
 -- Author: NiDZ (Modified by Assistant)
--- Version: 0.1.5
+-- Version: 0.1.5.1
 
 local math = math
 local vec2 = vec2
@@ -24,8 +24,14 @@ local glitter = {}
 local glitterCount = 0
 local speedWarning = 0
 local highestScore = 0
-local playerRanking = 0
+local playerRanking = 1
 local serverScores = {}
+local playerName = ""
+
+local function initializePlayer()
+    playerName = ac.getDriverName(0)
+    serverScores[playerName] = 0
+end
 
 function script.prepare(dt)
     ac.debug("speed", ac.getCarState(1).speedKmh)
@@ -33,7 +39,6 @@ function script.prepare(dt)
 end
 
 local function sendScore()
-    local playerName = ac.getDriverName(0)
     ac.sendChatMessage("/score " .. playerName .. " " .. highestScore)
 end
 
@@ -46,7 +51,6 @@ local function parseScoreMessage(message)
 end
 
 local function updatePlayerRanking()
-    local playerName = ac.getDriverName(0)
     local ranking = 1
     for name, score in pairs(serverScores) do
         if name ~= playerName and score > highestScore then
@@ -84,6 +88,7 @@ end
 
 function script.update(dt)
     if timePassed == 0 then
+        initializePlayer()
         addMessage("Let's start!", 0)
     end
 
@@ -138,6 +143,13 @@ function script.update(dt)
         return
     else
         dangerouslySlowTimer = 0
+    end
+
+    if totalScore > highestScore then
+        highestScore = math.floor(totalScore)
+        serverScores[playerName] = highestScore
+        sendScore()  -- Send the new high score to the server
+        updatePlayerRanking()
     end
 
     for i = 1, sim.carsCount do
@@ -304,7 +316,8 @@ local speedWarning = 0
         ui.pushFont(ui.Font.Title)
         ui.text('No HESI BABY!!!')
         ui.text("Highest Score: " .. highestScore .. " pts")
-        ui.text("Your Ranking: " .. playerRanking .. " / " .. #serverScores)
+        ui.text("Current Score: " .. math.floor(totalScore) .. " pts")
+        ui.text("Your Ranking: " .. playerRanking .. " / " .. table.count(serverScores))
         ui.popFont()
         ui.popStyleVar()
 
