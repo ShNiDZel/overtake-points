@@ -45,24 +45,28 @@ local nearHitOvertakeMessages = {
 }
 
 local function getScoreFilePath()
-    local documentsPath = ac.getFolder(ac.FolderID.Documents)
-    return documentsPath .. "/Assetto Corsa/highscores.txt"
+    local documentsPath = ac.getFolder(ac.FolderID.ACApps) -- Changed from Documents to ACApps
+    local filePath = documentsPath .. "/highscores.txt"
+    ac.console("Attempting to use file path: " .. filePath)
+    return filePath
 end
 
 local function saveScores()
+    ac.console("Attempting to save scores...")
     local file = io.open(getScoreFilePath(), "w")
     if file then
         for name, score in pairs(serverScores) do
             file:write(name .. ":" .. score .. "\n")
         end
         file:close()
-        ac.log("Scores saved successfully")
+        ac.console("Scores saved successfully")
     else
-        ac.log("Error: Unable to save scores")
+        ac.console("Error: Unable to save scores")
     end
 end
 
 local function loadScores()
+    ac.console("Attempting to load scores...")
     local file = io.open(getScoreFilePath(), "r")
     if file then
         for line in file:lines() do
@@ -72,22 +76,22 @@ local function loadScores()
             end
         end
         file:close()
-        ac.log("Scores loaded successfully")
+        ac.console("Scores loaded successfully")
     else
-        ac.log("No existing score file found")
+        ac.console("No existing score file found")
     end
     updatePlayerRanking()
 end
 
 local function initializePlayer()
     playerName = ac.getDriverName(0)
-    ac.log("Initializing player: " .. playerName)
+    ac.console("Initializing player: " .. playerName)
     loadScores()
     if not serverScores[playerName] then
         serverScores[playerName] = 0
         saveScores()
     end
-    ac.log("Player initialized with score: " .. serverScores[playerName])
+    ac.console("Player initialized with score: " .. (serverScores[playerName] or "N/A"))
 end
 
 function script.prepare(dt)
@@ -216,7 +220,7 @@ function script.update(dt)
     if totalScore > highestScore then
         highestScore = math.floor(totalScore)
         serverScores[playerName] = highestScore
-        ac.log("New high score achieved: " .. highestScore)
+        ac.console("New high score achieved: " .. highestScore)
         sendScore()
         updatePlayerRanking()
     end
