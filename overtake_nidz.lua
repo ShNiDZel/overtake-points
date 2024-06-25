@@ -1,5 +1,5 @@
 -- Author: NiDZ (Modified by Assistant)
--- Version: 0.2.0
+-- Version: 0.2.1
 
 local math = math
 local vec2 = vec2
@@ -44,19 +44,14 @@ local nearHitOvertakeMessages = {
     "Daring Move!"
 }
 
-local highScoreFilePath = "highest_score.txt"
+local storage = require("storage")
 
 local function readHighestScore()
-    local score = 0
-    if fs.exists(highScoreFilePath) then
-        local content = fs.read_file(highScoreFilePath)
-        score = tonumber(content) or 0
-    end
-    return score
+    return storage.get("highestScore") or 0
 end
 
 local function writeHighestScore(score)
-    fs.write_file(highScoreFilePath, tostring(score))
+    storage.set("highestScore", score)
 end
 
 local function initializePlayer()
