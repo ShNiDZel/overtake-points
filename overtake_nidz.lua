@@ -1,5 +1,5 @@
 -- Author: NiDZ (Modified by Assistant)
--- Version: 0.1.6
+-- Version: 0.2.0
 
 local math = math
 local vec2 = vec2
@@ -23,10 +23,11 @@ local messages = {}
 local glitter = {}
 local glitterCount = 0
 local speedWarning = 0
-local highestScore = 0
 local playerRanking = 1
 local serverScores = {}
 local playerName = ""
+local broadcastTimer = 0
+local BROADCAST_INTERVAL = 60  -- Broadcast scores every 60 seconds
 
 local overtakeMessages = {
     "Nice Overtake",
@@ -44,75 +45,28 @@ local nearHitOvertakeMessages = {
     "Daring Move!"
 }
 
-local function getScoreFilePath()
-    local documentsPath = ac.getFolder(ac.FolderID.ACApps) -- Changed from Documents to ACApps
-    local filePath = documentsPath .. "/highscores.txt"
-    ac.console("Attempting to use file path: " .. filePath)
-    return filePath
+local function broadcastScores()
+    local scoreMessage = "ALLSCORES:"
+    for name, score in pairs(serverScores) do
+        scoreMessage = scoreMessage .. name .. ":" .. score .. ";"
+    end
+    ac.sendChatMessage(scoreMessage)
 end
 
-local function saveScores()
-    ac.console("Attempting to save scores...")
-    local file = io.open(getScoreFilePath(), "w")
-    if file then
-        for name, score in pairs(serverScores) do
-            file:write(name .. ":" .. score .. "\n")
-        end
-        file:close()
-        ac.console("Scores saved successfully")
-    else
-        ac.console("Error: Unable to save scores")
-    end
-end
-
-local function loadScores()
-    ac.console("Attempting to load scores...")
-    local file = io.open(getScoreFilePath(), "r")
-    if file then
-        for line in file:lines() do
-            local name, score = line:match("([^:]+):(%d+)")
-            if name and score then
-                serverScores[name] = tonumber(score)
-            end
-        end
-        file:close()
-        ac.console("Scores loaded successfully")
-    else
-        ac.console("No existing score file found")
-    end
+local function updateScore(name, score)
+    serverScores[name] = math.max(serverScores[name] or 0, score)
     updatePlayerRanking()
 end
 
-local function initializePlayer()
-    playerName = ac.getDriverName(0)
-    ac.console("Initializing player: " .. playerName)
-    loadScores()
-    if not serverScores[playerName] then
-        serverScores[playerName] = 0
-        saveScores()
-    end
-    ac.console("Player initialized with score: " .. (serverScores[playerName] or "N/A"))
-end
-
-function script.prepare(dt)
-    ac.debug("speed", ac.getCarState(1).speedKmh)
-    return ac.getCarState(1).speedKmh > 60
-end
-
-local function sendScore()
-    ac.sendChatMessage("SCORE:" .. playerName .. ":" .. highestScore)
-    serverScores[playerName] = highestScore
-    saveScores()
-end
-
 local function parseScoreMessage(message)
-    local prefix, name, score = message:match("(SCORE:)(%S+):(%d+)")
-    if prefix == "SCORE:" and name and score then
-        score = tonumber(score)
-        if not serverScores[name] or score > serverScores[name] then
-            serverScores[name] = score
-            saveScores()
-            updatePlayerRanking()  -- This line is already here, but I'm including it for context
+    if message:sub(1, 6) == "SCORE:" then
+        local name, score = message:match("SCORE:([^:]+):(%d+)")
+        if name and score then
+            updateScore(name, tonumber(score))
+        end
+    elseif message:sub(1, 10) == "ALLSCORES:" then
+        for name, score in message:sub(11):gmatch("([^:]+):(%d+);") do
+            updateScore(name, tonumber(score))
         end
     end
 end
@@ -126,6 +80,20 @@ local function updatePlayerRanking()
         end
     end
     playerRanking = ranking
+end
+
+local function initializePlayer()
+    playerName = ac.getDriverName(0)
+    ac.log("Initializing player: " .. playerName)
+    if not serverScores[playerName] then
+        serverScores[playerName] = 0
+    end
+    updatePlayerRanking()
+    ac.log("Player initialized with score: " .. serverScores[playerName])
+end
+
+local function sendScore()
+    ac.sendChatMessage("SCORE:" .. playerName .. ":" .. highestScore)
 end
 
 local function addMessage(text, mood)
@@ -158,6 +126,11 @@ local function getRandomMessage(messageArray)
     return messageArray[math.random(#messageArray)]
 end
 
+function script.prepare(dt)
+    ac.debug("speed", ac.getCarState(1).speedKmh)
+    return ac.getCarState(1).speedKmh > 60
+end
+
 function script.update(dt)
     if timePassed == 0 then
         initializePlayer()
@@ -170,7 +143,7 @@ function script.update(dt)
         if totalScore > highestScore then
             highestScore = math.floor(totalScore)
             ac.sendChatMessage("Scored " .. highestScore .. " points.")
-            sendScore()  -- Send the new high score to the server
+            sendScore()
         end
         totalScore = 0
         comboMeter = 1
@@ -220,7 +193,6 @@ function script.update(dt)
     if totalScore > highestScore then
         highestScore = math.floor(totalScore)
         serverScores[playerName] = highestScore
-        ac.console("New high score achieved: " .. highestScore)
         sendScore()
         updatePlayerRanking()
     end
@@ -290,34 +262,17 @@ function script.update(dt)
             state.nearMiss = false
         end
     end
+
+    -- Broadcast scores periodically
+    broadcastTimer = broadcastTimer + dt
+    if broadcastTimer >= BROADCAST_INTERVAL then
+        broadcastScores()
+        broadcastTimer = 0
+    end
 end
 
 function script.onChatMessage(message)
     parseScoreMessage(message)
-end
-
-local messages = {}
-local glitter = {}
-local glitterCount = 0
-
-function addMessage(text, mood)
-    for i = math.min(#messages + 1, 4), 2, -1 do
-        messages[i] = messages[i - 1]
-        messages[i].targetPos = i
-    end
-    messages[1] = {text = text, age = 0, targetPos = 1, currentPos = 1, mood = mood}
-    if mood == 1 then
-        for i = 1, 60 do
-            local dir = vec2(math.random() - 0.5, math.random() - 0.5)
-            glitterCount = glitterCount + 1
-            glitter[glitterCount] = {
-                color = rgbm.new(hsv(math.random() * 360, 1, 1):rgb(), 1),
-                pos = vec2(80, 140) + dir * vec2(40, 20),
-                velocity = dir:normalize():scale(0.2 + math.random()),
-                life = 0.5 + 0.5 * math.random()
-            }
-        end
-    end
 end
 
 local function updateMessages(dt)
@@ -358,82 +313,83 @@ local function updateMessages(dt)
 end
 
 local speedWarning = 0
-    function script.drawUI()
-        local uiState = ac.getUiState()
-        updateMessages(uiState.dt)
 
-        local speedRelative = math.saturate(math.floor(ac.getCarState(1).speedKmh) / requiredSpeed)
-        speedWarning = math.applyLag(speedWarning, speedRelative < 1 and 1 or 0, 0.5, uiState.dt)
+function script.drawUI()
+    local uiState = ac.getUiState()
+    updateMessages(uiState.dt)
 
-        local colorDark = rgbm(0.4, 0.4, 0.4, 1)
-        local colorGrey = rgbm(0.7, 0.7, 0.7, 1)
-        local colorAccent = rgbm.new(hsv(speedRelative * 120, 1, 1):rgb(), 1)
-        local colorCombo =
-            rgbm.new(hsv(comboColor, math.saturate(comboMeter / 10), 1):rgb(), math.saturate(comboMeter / 4))
+    local speedRelative = math.saturate(math.floor(ac.getCarState(1).speedKmh) / requiredSpeed)
+    speedWarning = math.applyLag(speedWarning, speedRelative < 1 and 1 or 0, 0.5, uiState.dt)
 
-        local function speedMeter(ref)
-            ui.drawRectFilled(ref + vec2(0, -4), ref + vec2(180, 5), colorDark, 1)
-            ui.drawLine(ref + vec2(0, -4), ref + vec2(0, 4), colorGrey, 1)
-            ui.drawLine(ref + vec2(requiredSpeed, -4), ref + vec2(requiredSpeed, 4), colorGrey, 1)
+    local colorDark = rgbm(0.4, 0.4, 0.4, 1)
+    local colorGrey = rgbm(0.7, 0.7, 0.7, 1)
+    local colorAccent = rgbm.new(hsv(speedRelative * 120, 1, 1):rgb(), 1)
+    local colorCombo =
+        rgbm.new(hsv(comboColor, math.saturate(comboMeter / 10), 1):rgb(), math.saturate(comboMeter / 4))
 
-            local speed = math.min(ac.getCarState(1).speedKmh, 180)
-            if speed > 1 then
-                ui.drawLine(ref + vec2(0, 0), ref + vec2(speed, 0), colorAccent, 4)
-            end
+    local function speedMeter(ref)
+        ui.drawRectFilled(ref + vec2(0, -4), ref + vec2(180, 5), colorDark, 1)
+        ui.drawLine(ref + vec2(0, -4), ref + vec2(0, 4), colorGrey, 1)
+        ui.drawLine(ref + vec2(requiredSpeed, -4), ref + vec2(requiredSpeed, 4), colorGrey, 1)
+
+        local speed = math.min(ac.getCarState(1).speedKmh, 180)
+        if speed > 1 then
+            ui.drawLine(ref + vec2(0, 0), ref + vec2(speed, 0), colorAccent, 4)
         end
-
-        ui.beginTransparentWindow("overtakeScore", vec2(200, 100), vec2(400 * 2.5, 400 * 2.5))
-        ui.beginOutline()
-    
-        ui.pushStyleVar(ui.StyleVar.Alpha, 1 - speedWarning)
-        ui.pushFont(ui.Font.Title)
-        ui.text('No HESI BABY!!!')
-        ui.text("Highest Score: " .. highestScore .. " pts")
-        ui.text("Current Score: " .. math.floor(totalScore) .. " pts")
-        ui.text("Your Ranking: " .. playerRanking .. " / " .. table.count(serverScores))
-        ui.popFont()
-        ui.popStyleVar()
-
-        ui.pushFont(ui.Font.Title)
-        ui.text(totalScore .. " pts")
-        ui.sameLine(0, 20)
-        ui.beginRotation()
-        ui.textColored(math.ceil(comboMeter * 10) / 10 .. "x", colorCombo)
-        if comboMeter > 20 then
-            ui.endRotation(math.sin(comboMeter / 180 * 3141.5) * 3 * math.lerpInvSat(comboMeter, 20, 30) + 90)
-        end
-        ui.popFont()
-        ui.endOutline(rgbm(0, 0, 0, 0.3))
-
-        ui.offsetCursorY(20)
-        ui.pushFont(ui.Font.Main)
-        local startPos = ui.getCursor()
-        for i = 1, #messages do
-            local m = messages[i]
-            local f = math.saturate(4 - m.currentPos) * math.saturate(8 - m.age)
-            ui.setCursor(startPos + vec2(20 * 0.5 + math.saturate(1 - m.age * 10) ^ 2 * 50, (m.currentPos - 1) * 15))
-            ui.textColored(
-                m.text,
-                m.mood == 1 and rgbm(0, 1, 0, f) or m.mood == -1 and rgbm(1, 0, 0, f) or rgbm(1, 1, 1, f)
-            )
-        end
-        for i = 1, glitterCount do
-            local g = glitter[i]
-            if g ~= nil then
-                ui.drawLine(g.pos, g.pos + g.velocity * 4, g.color, 2)
-            end
-        end
-        ui.popFont()
-        ui.setCursor(startPos + vec2(0, 4 * 30))
-
-        ui.pushStyleVar(ui.StyleVar.Alpha, speedWarning)
-        ui.setCursorY(0)
-        ui.pushFont(ui.Font.Main)
-        ui.textColored("Keep speed above " .. requiredSpeed .. " km/h:", colorAccent)
-        speedMeter(ui.getCursor() + vec2(-9 * 0.5, 4 * 0.2))
-
-        ui.popFont()
-        ui.popStyleVar()
-
-        ui.endTransparentWindow()
     end
+
+    ui.beginTransparentWindow("overtakeScore", vec2(200, 100), vec2(400 * 2.5, 400 * 2.5))
+    ui.beginOutline()
+    
+    ui.pushStyleVar(ui.StyleVar.Alpha, 1 - speedWarning)
+    ui.pushFont(ui.Font.Title)
+    ui.text('No HESI BABY!!!')
+    ui.text("Highest Score: " .. highestScore .. " pts")
+    ui.text("Current Score: " .. math.floor(totalScore) .. " pts")
+    ui.text("Your Ranking: " .. playerRanking .. " / " .. table.count(serverScores))
+    ui.popFont()
+    ui.popStyleVar()
+
+    ui.pushFont(ui.Font.Title)
+    ui.text(totalScore .. " pts")
+    ui.sameLine(0, 20)
+    ui.beginRotation()
+    ui.textColored(math.ceil(comboMeter * 10) / 10 .. "x", colorCombo)
+    if comboMeter > 20 then
+        ui.endRotation(math.sin(comboMeter / 180 * 3141.5) * 3 * math.lerpInvSat(comboMeter, 20, 30) + 90)
+    end
+    ui.popFont()
+    ui.endOutline(rgbm(0, 0, 0, 0.3))
+
+    ui.offsetCursorY(20)
+    ui.pushFont(ui.Font.Main)
+    local startPos = ui.getCursor()
+    for i = 1, #messages do
+        local m = messages[i]
+        local f = math.saturate(4 - m.currentPos) * math.saturate(8 - m.age)
+        ui.setCursor(startPos + vec2(20 * 0.5 + math.saturate(1 - m.age * 10) ^ 2 * 50, (m.currentPos - 1) * 15))
+        ui.textColored(
+            m.text,
+            m.mood == 1 and rgbm(0, 1, 0, f) or m.mood == -1 and rgbm(1, 0, 0, f) or rgbm(1, 1, 1, f)
+        )
+    end
+    for i = 1, glitterCount do
+        local g = glitter[i]
+        if g ~= nil then
+            ui.drawLine(g.pos, g.pos + g.velocity * 4, g.color, 2)
+        end
+    end
+    ui.popFont()
+    ui.setCursor(startPos + vec2(0, 4 * 30))
+
+    ui.pushStyleVar(ui.StyleVar.Alpha, speedWarning)
+    ui.setCursorY(0)
+    ui.pushFont(ui.Font.Main)
+    ui.textColored("Keep speed above " .. requiredSpeed .. " km/h:", colorAccent)
+    speedMeter(ui.getCursor() + vec2(-9 * 0.5, 4 * 0.2))
+
+    ui.popFont()
+    ui.popStyleVar()
+
+    ui.endTransparentWindow()
+end
