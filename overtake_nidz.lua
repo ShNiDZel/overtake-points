@@ -216,10 +216,11 @@ function script.update(dt)
             if car.collidedWith == 0 then
                 addMessage("Collision", -1)
                 state.collided = true
-
+            
                 if totalScore > highestScore then
                     highestScore = math.floor(totalScore)
-                    ac.sendChatMessage("Scored " .. totalScore .. " points.")
+                    writeHighestScore(highestScore)
+                    ac.sendChatMessage("New highest score: " .. highestScore .. " points.")
                 end
                 totalScore = 0
                 comboMeter = 1
