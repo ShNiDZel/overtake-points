@@ -44,18 +44,26 @@ local nearHitOvertakeMessages = {
     "Daring Move!"
 }
 
+local function getScoreFilePath()
+    local documentsPath = ac.getFolder(ac.FolderID.Documents)
+    return documentsPath .. "/Assetto Corsa/highscores.txt"
+end
+
 local function saveScores()
-    local file = io.open("highscores.txt", "w")
+    local file = io.open(getScoreFilePath(), "w")
     if file then
         for name, score in pairs(serverScores) do
             file:write(name .. ":" .. score .. "\n")
         end
         file:close()
+        ac.log("Scores saved successfully")
+    else
+        ac.log("Error: Unable to save scores")
     end
 end
 
 local function loadScores()
-    local file = io.open("highscores.txt", "r")
+    local file = io.open(getScoreFilePath(), "r")
     if file then
         for line in file:lines() do
             local name, score = line:match("([^:]+):(%d+)")
@@ -64,17 +72,22 @@ local function loadScores()
             end
         end
         file:close()
+        ac.log("Scores loaded successfully")
+    else
+        ac.log("No existing score file found")
     end
-    updatePlayerRanking()  -- Add this line
+    updatePlayerRanking()
 end
 
 local function initializePlayer()
     playerName = ac.getDriverName(0)
-    loadScores()  -- This will also call updatePlayerRanking
+    ac.log("Initializing player: " .. playerName)
+    loadScores()
     if not serverScores[playerName] then
         serverScores[playerName] = 0
         saveScores()
     end
+    ac.log("Player initialized with score: " .. serverScores[playerName])
 end
 
 function script.prepare(dt)
@@ -203,7 +216,8 @@ function script.update(dt)
     if totalScore > highestScore then
         highestScore = math.floor(totalScore)
         serverScores[playerName] = highestScore
-        sendScore()  -- This will now also save the scores
+        ac.log("New high score achieved: " .. highestScore)
+        sendScore()
         updatePlayerRanking()
     end
 
