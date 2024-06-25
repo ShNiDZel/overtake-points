@@ -44,9 +44,37 @@ local nearHitOvertakeMessages = {
     "Daring Move!"
 }
 
+local function saveScores()
+    local file = io.open("highscores.txt", "w")
+    if file then
+        for name, score in pairs(serverScores) do
+            file:write(name .. ":" .. score .. "\n")
+        end
+        file:close()
+    end
+end
+
+local function loadScores()
+    local file = io.open("highscores.txt", "r")
+    if file then
+        for line in file:lines() do
+            local name, score = line:match("([^:]+):(%d+)")
+            if name and score then
+                serverScores[name] = tonumber(score)
+            end
+        end
+        file:close()
+    end
+    updatePlayerRanking()  -- Add this line
+end
+
 local function initializePlayer()
     playerName = ac.getDriverName(0)
-    serverScores[playerName] = 0
+    loadScores()  -- This will also call updatePlayerRanking
+    if not serverScores[playerName] then
+        serverScores[playerName] = 0
+        saveScores()
+    end
 end
 
 function script.prepare(dt)
@@ -56,20 +84,27 @@ end
 
 local function sendScore()
     ac.sendChatMessage("SCORE:" .. playerName .. ":" .. highestScore)
+    serverScores[playerName] = highestScore
+    saveScores()
 end
 
 local function parseScoreMessage(message)
     local prefix, name, score = message:match("(SCORE:)(%S+):(%d+)")
     if prefix == "SCORE:" and name and score then
-        serverScores[name] = tonumber(score)
-        updatePlayerRanking()
+        score = tonumber(score)
+        if not serverScores[name] or score > serverScores[name] then
+            serverScores[name] = score
+            saveScores()
+            updatePlayerRanking()  -- This line is already here, but I'm including it for context
+        end
     end
 end
 
 local function updatePlayerRanking()
     local ranking = 1
+    local playerScore = serverScores[playerName] or 0
     for name, score in pairs(serverScores) do
-        if name ~= playerName and score > highestScore then
+        if name ~= playerName and score > playerScore then
             ranking = ranking + 1
         end
     end
@@ -168,7 +203,7 @@ function script.update(dt)
     if totalScore > highestScore then
         highestScore = math.floor(totalScore)
         serverScores[playerName] = highestScore
-        sendScore()  -- Send the new high score to the server
+        sendScore()  -- This will now also save the scores
         updatePlayerRanking()
     end
 
