@@ -31,8 +31,11 @@ local function getRandomMessage(messageArray)
 end
 
 local function addMessage(text, mood)
-    table.insert(messages, 1, {text = text, age = 0, targetPos = 1, currentPos = 1, mood = mood})
-    if #messages > MAX_MESSAGES then table.remove(messages) end
+    for i = MAX_MESSAGES, 2, -1 do
+        messages[i] = messages[i - 1]
+        if messages[i] then messages[i].targetPos = i end
+    end
+    messages[1] = {text = text, age = 0, targetPos = 1, currentPos = 1, mood = mood}
     if mood == 1 then addGlitter(60) end
     ac.debug("Message added", text, mood)
 end
@@ -223,9 +226,12 @@ end
 
 local function updateMessages(dt)
     comboColor = (comboColor + dt * 10 * comboMeter) % 360
-    for i, m in ipairs(messages) do
-        m.age = m.age + dt
-        m.currentPos = math.applyLag(m.currentPos, m.targetPos, 0.8, dt)
+    for i = 1, MAX_MESSAGES do
+        local m = messages[i]
+        if m then
+            m.age = m.age + dt
+            m.currentPos = math.applyLag(m.currentPos, m.targetPos, 0.8, dt)
+        end
     end
     for i = glitterCount, 1, -1 do
         local g = glitter[i]
@@ -292,10 +298,13 @@ function script.drawUI()
     ui.offsetCursorY(20)
     ui.pushFont(ui.Font.Main)
     local startPos = ui.getCursor()
-    for i, m in ipairs(messages) do
-        local f = math.saturate(4 - m.currentPos) * math.saturate(8 - m.age)
-        ui.setCursor(startPos + vec2(20 * 0.5 + math.saturate(1 - m.age * 10) ^ 2 * 50, (m.currentPos - 1) * 15))
-        ui.textColored(m.text, m.mood == 1 and rgbm(0, 1, 0, f) or m.mood == -1 and rgbm(1, 0, 0, f) or rgbm(1, 1, 1, f))
+    for i = 1, MAX_MESSAGES do
+        local m = messages[i]
+        if m then
+            local f = math.saturate(4 - m.currentPos) * math.saturate(8 - m.age)
+            ui.setCursor(startPos + vec2(20 * 0.5 + math.saturate(1 - m.age * 10) ^ 2 * 50, (m.currentPos - 1) * 30))
+            ui.textColored(m.text, m.mood == 1 and rgbm(0, 1, 0, f) or m.mood == -1 and rgbm(1, 0, 0, f) or rgbm(1, 1, 1, f))
+        end
     end
     for i = 1, glitterCount do
         local g = glitter[i]
